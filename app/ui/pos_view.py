@@ -184,18 +184,43 @@ class QuickSalePage(QWidget):
         if self.order_type == "delivery":
             row2 = QHBoxLayout()
             row2.setSpacing(10)
-            self.customer = QLineEdit()
-            self.customer.setPlaceholderText("Customer name")
-            self.customer.setMinimumWidth(150)
+            # Telefone em primeiro lugar, destacado visualmente
             self.phone = QLineEdit()
-            self.phone.setPlaceholderText("Phone")
-            self.phone.setMinimumWidth(120)
+            self.phone.setPlaceholderText("\\ud83d\\ude\\ phone (31) 99999-9999")
+            self.phone.setMinimumWidth(180)
+            # Fundo destaque e border radius para o campo telefone
+            self.phone.setStyleSheet(
+                "QLineEdit {\n"
+                "   background-color: #E0F7FA;\n"
+                "   border: 2px solid #0288D1;\n"
+                "   border-radius: 8px;\n"
+                "   padding: 8px 12px;\n"
+                "   font-size: 13px;\n"
+                "   color: #000000;\n"
+                "}"
+            )
+            # Nome do cliente em segundo lugar
+            self.customer = QLineEdit()
+            self.customer.setPlaceholderText("Nome do cliente")
+            self.customer.setMinimumWidth(160)
+            # Endereço de entrega em terceiro lugar
             self.address = QLineEdit()
-            self.address.setPlaceholderText("Delivery address")
+            self.address.setPlaceholderText("Endereço de entrega")
             self.address.setMinimumWidth(220)
-            row2.addWidget(self.customer)
+            self.neighborhood = QComboBox()
+            self.neighborhood.setMinimumWidth(130)
+            self.neighborhood.addItem("— Bairro —", None)
+            for nb in neighborhood_service.list_active():
+                self.neighborhood.addItem(nb["name"], nb["id"])
+            self.neighborhood.currentIndexChanged.connect(self._neighborhood_changed)
+            self.btn_new_customer = QPushButton("+ Cadastrar Cliente")
+            self.btn_new_customer.setProperty("warning", True)
+            self.btn_new_customer.clicked.connect(self._register_customer)
             row2.addWidget(self.phone)
+            row2.addWidget(self.customer)
             row2.addWidget(self.address)
+            row2.addWidget(self.neighborhood)
+            row2.addWidget(self.btn_new_customer)
             row2.addStretch()
             vh.addLayout(row2)
         lay.addWidget(head)
