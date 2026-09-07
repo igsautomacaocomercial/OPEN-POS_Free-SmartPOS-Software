@@ -1,4 +1,5 @@
 from app.database.db import get_db
+from app.services.finance_service import finance_service
 from app.services.settings_service import settings_service
 from app.utils.helpers import now_str
 
@@ -9,14 +10,17 @@ class OrderService:
 
     def create_order(self, order_type="dine-in", cashier_id=None, waiter_id=None,
                      rider_id=None, table_id=None, customer_name="", customer_phone="",
-                     customer_address="", service_charge=0.0, instructions=""):
+                     customer_address="", service_charge=0.0, instructions="",
+                     customer_id=None, neighborhood_id=None):
         number = settings_service.next_order_number()
         order_id = self._db.execute(
             "INSERT INTO orders (order_number, order_type, table_id, waiter_id, rider_id, "
-            "cashier_id, instructions, customer_name, customer_phone, customer_address, service_charge) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "cashier_id, instructions, customer_name, customer_phone, customer_address, "
+            "service_charge, customer_id, neighborhood_id) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (number, order_type, table_id, waiter_id, rider_id, cashier_id, instructions,
-             customer_name, customer_phone, customer_address, float(service_charge or 0)),
+             customer_name, customer_phone, customer_address, float(service_charge or 0),
+             customer_id, neighborhood_id),
         )
         return self.get(order_id)
 
@@ -47,7 +51,7 @@ class OrderService:
         if product_id:
             product = self._db.fetchone("SELECT * FROM products WHERE id=?", (product_id,))
             if not product:
-                raise ValueError("Product not found.")
+                raise ValueError("Produto não encontrado.")
             name = product["name"]
             price = product["price"]
         self._db.execute(
@@ -88,6 +92,51 @@ class OrderService:
 
     def set_waiter(self, order_id, waiter_id):
         self._db.execute("UPDATE orders SET waiter_id=? WHERE id=?", (waiter_id, order_id))
+
+    def set_service_charge(self, order_id, amount):
+        self._db.execute(
+            "UPDATE orders SET service_charge=? WHERE id=?", (float(amount or 0), order_id))
+        self._recalc(order_id)
+
+    def set_customer_info(self, order_id, customer_id=None, name=None, phone=None, address=None):
+        self._db.execute(
+            "UPDATE orders SET customer_id=?, customer_name=?, customer_phone=?, customer_address=? WHERE id=?",
+            (customer_id, name or "", phone or "", address or "", order_id))
+
+    def transfer_order(self, order_id, to_table_id):
+        order = self.get(order_id)
+        if not order:
+            raise ValueError("Pedido não encontrado.")
+        if (order["table_id"] or -1) == to_table_id:
+            return
+        target = self._db.fetchone("SELECT status FROM tables WHERE id=?", (to_table_id,))
+        if target and target["status"] != "free":
+            raise ValueError("A mesa de destino está ocupada.")
+        self._db.execute("UPDATE orders SET table_id=? WHERE id=?", (to_table_id, order_id))
+        if order["table_id"]:
+            self._db.execute(
+                "UPDATE tables SET status='free', current_order_id=NULL WHERE id=?",
+                (order["table_id"],))
+        self._db.execute(
+            "UPDATE tables SET status='occupied', current_order_id=? WHERE id=?",
+            (order_id, to_table_id))
+
+    def merge_orders(self, source_id, target_id):
+        if source_id == target_id:
+            raise ValueError("Escolha mesas diferentes.")
+        source = self.get(source_id)
+        target = self.get(target_id)
+        if not source or not target:
+            raise ValueError("Pedidos não encontrados.")
+        items = self.get_items(source_id)
+        for it in items:
+            self._db.execute(
+                "INSERT INTO order_items (order_id, product_id, name, price, qty, instructions) "
+                "VALUES (?,?,?,?,?,?)",
+                (target_id, it["product_id"], it["name"], it["price"], it["qty"], it["instructions"]))
+        self._db.execute("DELETE FROM order_items WHERE order_id=?", (source_id,))
+        self._recalc(target_id)
+        self.manual_close(source_id)
 
     def _recalc(self, order_id):
         order = self.get(order_id)
@@ -132,7 +181,7 @@ class OrderService:
                     (order_id, order["table_id"]),
                 )
 
-    def finalize(self, order_id, payment_method="Cash"):
+    def finalize(self, order_id, payment_method="Dinheiro"):
         self._db.execute(
             "UPDATE orders SET status='paid', payment_method=?, closed_at=? WHERE id=?",
             (payment_method, now_str(), order_id),
@@ -143,6 +192,12 @@ class OrderService:
                 "UPDATE tables SET status='free', current_order_id=NULL WHERE id=?",
                 (order["table_id"],),
             )
+
+    
+        try:
+            finance_service.record_sale(order["total"], f"Venda #{order['order_number']}")
+        except Exception:
+            pass
 
     def manual_close(self, order_id):
         self._db.execute(
@@ -188,6 +243,18 @@ class OrderService:
             "LEFT JOIN staff w ON w.id=o.waiter_id "
             "WHERE o.status='paid' AND date(o.created_at)=date('now','localtime') "
             "ORDER BY o.id DESC"
+        )
+
+    def list_by_customer(self, customer_id, limit=500):
+        return self._db.fetchall(
+            "SELECT o.*, t.table_no, w.name AS waiter_name, r.name AS rider_name, "
+            "u.full_name AS cashier_name FROM orders o "
+            "LEFT JOIN tables t ON t.id=o.table_id "
+            "LEFT JOIN staff w ON w.id=o.waiter_id "
+            "LEFT JOIN staff r ON r.id=o.rider_id "
+            "LEFT JOIN users u ON u.id=o.cashier_id "
+            "WHERE o.customer_id=? ORDER BY o.id DESC LIMIT ?",
+            (customer_id, limit),
         )
 
 

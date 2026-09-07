@@ -51,9 +51,56 @@ CREATE TABLE IF NOT EXISTS tables (
 CREATE TABLE IF NOT EXISTS staff (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'Waiter',
+    role TEXT NOT NULL DEFAULT 'Garçom',
     phone TEXT,
     is_active INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    phone TEXT UNIQUE NOT NULL,
+    document TEXT NOT NULL DEFAULT '',
+    cep TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    entity_type TEXT NOT NULL DEFAULT 'PF',
+    address TEXT NOT NULL DEFAULT '',
+    city TEXT NOT NULL DEFAULT '',
+    state TEXT NOT NULL DEFAULT '',
+    neighborhood TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS suppliers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    document TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    cep TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT '',
+    city TEXT NOT NULL DEFAULT '',
+    state TEXT NOT NULL DEFAULT '',
+    neighborhood TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS neighborhoods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    delivery_fee REAL NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS payment_methods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -75,7 +122,7 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_name TEXT NOT NULL DEFAULT '',
     customer_phone TEXT NOT NULL DEFAULT '',
     customer_address TEXT NOT NULL DEFAULT '',
-    payment_method TEXT NOT NULL DEFAULT 'Cash',
+    payment_method TEXT NOT NULL DEFAULT 'Dinheiro',
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     closed_at TEXT
 );
@@ -106,6 +153,56 @@ CREATE TABLE IF NOT EXISTS expenses (
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
+CREATE TABLE IF NOT EXISTS accounts_payable (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    description TEXT NOT NULL,
+    account_id INTEGER,
+    amount REAL NOT NULL DEFAULT 0,
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    paid_at TEXT,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+CREATE TABLE IF NOT EXISTS accounts_receivable (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    description TEXT NOT NULL,
+    account_id INTEGER,
+    amount REAL NOT NULL DEFAULT 0,
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    paid_at TEXT,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+CREATE TABLE IF NOT EXISTS cash_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    opened_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    opening_amount REAL NOT NULL DEFAULT 0,
+    closed_at TEXT,
+    closing_amount REAL,
+    closing_note TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'open'
+);
+CREATE TABLE IF NOT EXISTS cash_moves (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES cash_sessions(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    amount REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS chart_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'entrada' CHECK(type IN ('entrada','saida')),
+    is_active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(code, name)
+);
+
 CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
@@ -115,13 +212,13 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date);
 _DEFAULT_SETTINGS = {
     "store_name": "Open POS",
     "store_logo": "",
-    "store_email": "saban.productions00@gmail.com",
-    "store_phone": "0300-1234567",
-    "store_address": "Main Boulevard, Lahore",
-    "currency": "Rs",
-    "tax_name": "Sales Tax",
-    "tax_rate": "16",
-    "receipt_footer": "Thank you for visiting!",
+    "store_email": "contato@sualoja.com.br",
+    "store_phone": "(11) 99999-9999",
+    "store_address": "Sua Rua, 123 - Sua Cidade",
+    "currency": "R$",
+    "tax_name": "Imposto",
+    "tax_rate": "0",
+    "receipt_footer": "Obrigado pela preferência!",
     "receipt_show_logo": "1",
     "receipt_show_address": "1",
     "delivery_charge": "0",
@@ -134,6 +231,8 @@ _DEFAULT_SETTINGS = {
     "printer_encoding": "cp437",
     "printer_cols": "42",
     "printer_cut": "1",
+    "auto_backup": "0",
+    "auto_backup_hours": "24",
 }
 
 
@@ -204,6 +303,8 @@ class Database:
             "customer_address": "TEXT NOT NULL DEFAULT ''",
             "service_charge": "REAL NOT NULL DEFAULT 0",
             "rider_id": "INTEGER",
+            "customer_id": "INTEGER",
+            "neighborhood_id": "INTEGER",
         }.items():
             if name not in cols:
                 self._conn.execute(f"ALTER TABLE orders ADD COLUMN {name} {ddl}")
@@ -211,6 +312,24 @@ class Database:
         for name in ("stock", "barcode"):
             if name in pcols:
                 self._conn.execute(f"ALTER TABLE products DROP COLUMN {name}")
+        for table in ("accounts_payable", "accounts_receivable"):
+            cols = {r["name"] for r in self._conn.execute(
+                f"PRAGMA table_info({table})").fetchall()}
+            if "account_id" not in cols:
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN account_id INTEGER")
+        ccols = {r["name"] for r in self._conn.execute("PRAGMA table_info(customers)").fetchall()}
+        for name, ddl in {
+            "document": "TEXT NOT NULL DEFAULT ''",
+            "cep": "TEXT NOT NULL DEFAULT ''",
+            "email": "TEXT NOT NULL DEFAULT ''",
+            "entity_type": "TEXT NOT NULL DEFAULT 'PF'",
+            "city": "TEXT NOT NULL DEFAULT ''",
+            "state": "TEXT NOT NULL DEFAULT ''",
+            "neighborhood": "TEXT NOT NULL DEFAULT ''",
+            "is_active": "INTEGER NOT NULL DEFAULT 1",
+        }.items():
+            if name not in ccols:
+                self._conn.execute(f"ALTER TABLE customers ADD COLUMN {name} {ddl}")
         self._conn.execute("DELETE FROM settings WHERE key='tax_categories'")
         self._conn.commit()
 
@@ -219,7 +338,7 @@ class Database:
             h, salt = hash_password("admin123")
             self.execute(
                 "INSERT INTO users (username, password_hash, salt, full_name, role) VALUES (?,?,?,?,?)",
-                ("admin", h, salt, "Administrator", "admin"),
+                ("admin", h, salt, "Administrador", "admin"),
             )
         existing = {r["key"] for r in self.fetchall("SELECT key FROM settings")}
         for k, v in _DEFAULT_SETTINGS.items():
@@ -227,27 +346,27 @@ class Database:
                 self.execute("INSERT INTO settings (key, value) VALUES (?,?)", (k, v))
 
         if not self.fetchone("SELECT id FROM categories LIMIT 1"):
-            seed_categories = ["Coffee", "Tea", "Cold Drinks", "Shakes", "Desserts", "Snacks"]
+            seed_categories = ["Café", "Chá", "Bebidas Frias", "Shakes", "Sobremesas", "Lanches"]
             for i, name in enumerate(seed_categories, 1):
                 self.execute(
                     "INSERT INTO categories (name, sort_order) VALUES (?,?)", (name, i)
                 )
             products = [
-                ("Espresso", 250, 90, 1),
+                ("Café Expresso", 250, 90, 1),
                 ("Cappuccino", 350, 140, 1),
-                ("Latte", 380, 150, 1),
-                ("Hot Chocolate", 400, 180, 1),
-                ("Karak Chai", 150, 60, 2),
-                ("Green Tea", 200, 80, 2),
-                ("Iced Tea", 250, 100, 3),
-                ("Cold Coffee", 350, 150, 3),
-                ("Chocolate Shake", 450, 200, 4),
-                ("Mango Shake", 420, 180, 4),
-                ("Cheesecake Slice", 550, 300, 5),
+                ("Café com Leite", 380, 150, 1),
+                ("Chocolate Quente", 400, 180, 1),
+                ("Chá Karak", 150, 60, 2),
+                ("Chá Verde", 200, 80, 2),
+                ("Chá Gelado", 250, 100, 3),
+                ("Café Gelado", 350, 150, 3),
+                ("Milk Shake de Chocolate", 450, 200, 4),
+                ("Milk Shake de Manga", 420, 180, 4),
+                ("Fatia de Cheesecake", 550, 300, 5),
                 ("Brownie", 450, 200, 5),
-                ("Sandwich", 400, 220, 6),
-                ("Fries", 300, 120, 6),
-                ("Club Sandwich", 550, 300, 6),
+                ("Sanduíche", 400, 220, 6),
+                ("Batata Frita", 300, 120, 6),
+                ("Sanduíche de Frango", 550, 300, 6),
             ]
             for name, price, cost, cat in products:
                 self.execute(
@@ -256,18 +375,24 @@ class Database:
                 )
 
         if not self.fetchone("SELECT id FROM staff LIMIT 1"):
-            self.execute("INSERT INTO staff (name, role) VALUES (?,?)", ("Waiter 1", "Waiter"))
-            self.execute("INSERT INTO staff (name, role) VALUES (?,?)", ("Waiter 2", "Waiter"))
+            self.execute("INSERT INTO staff (name, role) VALUES (?,?)", ("Garçom 1", "Garçom"))
+            self.execute("INSERT INTO staff (name, role) VALUES (?,?)", ("Garçom 2", "Garçom"))
 
         if not self.fetchone("SELECT id FROM tables LIMIT 1"):
             for i in range(1, 9):
                 self.execute(
-                    "INSERT INTO tables (table_no, seats) VALUES (?,?)", (f"T{i}", 2 if i % 2 else 4)
+                    "INSERT INTO tables (table_no, seats) VALUES (?,?)", (str(i), 2 if i % 2 else 4)
                 )
 
         if not self.fetchone("SELECT id FROM expense_categories LIMIT 1"):
-            for name in ("Rent", "Utilities", "Groceries", "Staff Salary", "Misc"):
+            for name in ("Aluguel", "Contas (Água/Luz)", "Mercado", "Salários", "Diversos"):
                 self.execute("INSERT INTO expense_categories (name) VALUES (?)", (name,))
+
+        if not self.fetchone("SELECT id FROM payment_methods LIMIT 1"):
+            for i, name in enumerate(("Dinheiro", "Cartão", "Pix"), 1):
+                self.execute(
+                    "INSERT INTO payment_methods (name, sort_order) VALUES (?,?)", (name, i)
+                )
 
     def close(self):
         with self._lock:
@@ -298,6 +423,9 @@ class Database:
         required = {
             "users", "settings", "categories", "products", "tables", "staff",
             "orders", "order_items", "expenses", "expense_categories",
+            "customers", "neighborhoods", "payment_methods",
+            "accounts_payable", "accounts_receivable", "cash_sessions", "cash_moves",
+            "chart_accounts", "suppliers",
         }
         conn = sqlite3.connect(str(path))
         try:
@@ -373,11 +501,13 @@ def get_db() -> Database:
 def rebind_services(database: Database):
     """Re-point every service singleton's connection after a restore/reset."""
     from app.services import (
-        auth_service, expense_service, order_service, product_service,
-        report_service, settings_service, staff_service, table_service,
+        auth_service, aux_service, expense_service, finance_service,
+        order_service, product_service, report_service, settings_service,
+        staff_service, table_service,
     )
-    for mod in (auth_service, expense_service, order_service, product_service,
-                report_service, settings_service, staff_service, table_service):
+    for mod in (auth_service, aux_service, expense_service, finance_service,
+                order_service, product_service, report_service, settings_service,
+                staff_service, table_service):
         singleton = getattr(mod, mod.__name__.rsplit(".", 1)[-1], None)
         if singleton is not None and hasattr(singleton, "_db"):
             singleton._db = database

@@ -1,20 +1,23 @@
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton,
-    QVBoxLayout, QWidget,
+    QComboBox, QDialog, QFrame, QHBoxLayout, QInputDialog, QLabel, QMessageBox,
+    QPushButton, QVBoxLayout, QWidget,
 )
 
 from app.printing.printer_service import (
     print_final_bill, print_kot, print_request_bill,
 )
+from app.services.aux_service import payment_service
 from app.services.auth_service import auth_service
 from app.services.order_service import order_service
+from app.services.settings_service import settings_service
 from app.services.staff_service import staff_service
 from app.services.table_service import table_service
+from app.utils.helpers import fmt_money
 from app.ui.cart_panel import CartPanel
 from app.ui.icons import make_icon
 
-STATUS_LABEL = {"free": "FREE", "occupied": "OCCUPIED", "request_bill": "REQUEST BILL"}
+STATUS_LABEL = {"free": "LIVRE", "occupied": "OCUPADA", "request_bill": "PEDINDO CONTA"}
 
 
 class TablePopup(QDialog):
@@ -22,7 +25,7 @@ class TablePopup(QDialog):
         super().__init__(parent)
         self.table = dict(table) if hasattr(table, "keys") else table
         self.order = None
-        self.setWindowTitle(f"Table {table['table_no']}")
+        self.setWindowTitle(f"Mesa {table['table_no']}")
         self.resize(1080, 640)
         self.setModal(True)
         self._build()
@@ -34,7 +37,7 @@ class TablePopup(QDialog):
         root.setSpacing(12)
 
         head = QHBoxLayout()
-        title = QLabel(f"Table {self.table['table_no']}  ·  {self.table['seats']} seats")
+        title = QLabel(f"Mesa {self.table['table_no']}  ·  {self.table['seats']} lugares")
         title.setStyleSheet("font-size: 20px; font-weight: 800; color: #111827;")
         head.addWidget(title)
         status = QLabel()
@@ -45,12 +48,12 @@ class TablePopup(QDialog):
         status.setStyleSheet(f"background: {bg}22; color: {bg}; font-weight: 800; padding: 4px 12px; border-radius: 12px;")
         head.addWidget(status)
         head.addStretch()
-        head.addWidget(QLabel("Waiter:"))
+        head.addWidget(QLabel("Garçom:"))
 
         self.waiter = QComboBox()
         self.waiter.setMinimumWidth(180)
         self.waiters = staff_service.list_waiters()
-        self.waiter.addItem("— Select Waiter —", None)
+        self.waiter.addItem("— Selecionar Garçom —", None)
         for w in self.waiters:
             self.waiter.addItem(w["name"], w["id"])
         self.waiter.currentIndexChanged.connect(self._waiter_changed)
@@ -65,33 +68,58 @@ class TablePopup(QDialog):
         actions = QHBoxLayout()
         actions.setSpacing(10)
 
-        self.btn_kot = QPushButton("   Print KOT")
+        self.btn_kot = QPushButton("   Imprimir KOT")
         self.btn_kot.setProperty("warning", True)
         self.btn_kot.setIcon(make_icon("print", "#ffffff", 24))
         self.btn_kot.setIconSize(QSize(18, 18))
         self.btn_kot.clicked.connect(self._do_kot)
 
-        self.btn_request = QPushButton("   Request Bill")
+        self.btn_request = QPushButton("   Pedir Conta")
         self.btn_request.setProperty("primary", True)
         self.btn_request.setIcon(make_icon("note", "#ffffff", 24))
         self.btn_request.setIconSize(QSize(18, 18))
         self.btn_request.clicked.connect(self._do_request_bill)
 
-        self.pay_label = QLabel("Payment:")
+        self.pay_label = QLabel("Pagamento:")
+        self.btn_save = QPushButton("   Salvar")
+        self.btn_save.setIcon(make_icon("check", "#4b5563", 24))
+        self.btn_save.setIconSize(QSize(18, 18))
+        self.btn_save.setToolTip("Salva o pedido e mantém a mesa aberta para o cliente continuar consumindo.")
+        self.btn_save.clicked.connect(self._do_save)
+        self.btn_save.setEnabled(False)
         self.payment = QComboBox()
-        self.payment.addItems(["Cash", "Card", "QR"])
+        names = payment_service.list_active_names()
+        if not names:
+            names = ["Dinheiro", "Cartão", "Pix"]
+        self.payment.addItems(names)
+        idx = self.payment.findText("Dinheiro")
+        if idx >= 0:
+            self.payment.setCurrentIndex(idx)
 
-        self.btn_final = QPushButton("   Final Bill & Close")
+        self.btn_final = QPushButton("   Conta Final & Fechar")
         self.btn_final.setProperty("success", True)
         self.btn_final.setIcon(make_icon("check", "#ffffff", 24))
         self.btn_final.setIconSize(QSize(18, 18))
         self.btn_final.clicked.connect(self._do_final_bill)
 
-        self.btn_close = QPushButton("Close Table")
+        self.btn_close = QPushButton("Fechar Mesa (Sem Pagamento)")
+        self.btn_close.setToolTip("Fecha sem registrar pagamento (conta final não é impressa).")
+        self.btn_close.setEnabled(False)
         self.btn_close.clicked.connect(self._do_manual_close)
 
+        self.btn_transfer = QPushButton("Transferir Mesa")
+        self.btn_transfer.setToolTip("Move o pedido para outra mesa livre.")
+        self.btn_transfer.setEnabled(False)
+        self.btn_transfer.clicked.connect(self._transfer_table)
+        self.btn_merge = QPushButton("Juntar Contas")
+        self.btn_merge.setToolTip("Move os itens de outra mesa para esta (mesa de origem é liberada).")
+        self.btn_merge.setEnabled(False)
+        self.btn_merge.clicked.connect(self._merge_table)
         actions.addWidget(self.btn_kot)
         actions.addWidget(self.btn_request)
+        actions.addWidget(self.btn_transfer)
+        actions.addWidget(self.btn_merge)
+        actions.addWidget(self.btn_save)
         actions.addStretch()
         actions.addWidget(self.pay_label)
         actions.addWidget(self.payment)
@@ -111,12 +139,20 @@ class TablePopup(QDialog):
                 self.btn_final.setEnabled(True)
                 self.btn_request.setEnabled(True)
                 self.btn_kot.setEnabled(True)
+                self.btn_save.setEnabled(True)
+                self.btn_close.setEnabled(True)
+                self.btn_transfer.setEnabled(True)
+                self.btn_merge.setEnabled(True)
                 return
         # free table -> create order when first product added
         self.order = None
         self.btn_final.setEnabled(False)
         self.btn_request.setEnabled(False)
         self.btn_kot.setEnabled(False)
+        self.btn_save.setEnabled(False)
+        self.btn_close.setEnabled(False)
+        self.btn_transfer.setEnabled(False)
+        self.btn_merge.setEnabled(False)
 
     def _ensure_order(self):
         if self.order is None:
@@ -133,6 +169,10 @@ class TablePopup(QDialog):
             self.btn_final.setEnabled(True)
             self.btn_request.setEnabled(True)
             self.btn_kot.setEnabled(True)
+            self.btn_save.setEnabled(True)
+            self.btn_close.setEnabled(True)
+            self.btn_transfer.setEnabled(True)
+            self.btn_merge.setEnabled(True)
         return self.order
 
     def _add_product(self, product_id):
@@ -147,35 +187,117 @@ class TablePopup(QDialog):
     def _do_kot(self):
         order = self._ensure_order()
         if not order_service.get_items(order["id"]):
-            QMessageBox.information(self, "Empty Order", "Add items before printing KOT.")
+            QMessageBox.information(self, "Pedido Vazio", "Adicione itens antes de imprimir o KOT.")
             return
         try:
             print_kot(order)
         except Exception as e:
-            QMessageBox.critical(self, "Print Error", str(e))
+            QMessageBox.critical(self, "Erro de Impressão", str(e))
 
     def _do_request_bill(self):
         order = self._ensure_order()
         if not order_service.get_items(order["id"]):
-            QMessageBox.information(self, "Empty Order", "Add items before requesting bill.")
+            QMessageBox.information(self, "Pedido Vazio", "Adicione itens antes de pedir a conta.")
             return
         order_service.request_bill(order["id"])
         self.table["status"] = "request_bill"
         try:
             print_request_bill(order_service.get(order["id"]))
         except Exception as e:
-            QMessageBox.critical(self, "Print Error", str(e))
+            QMessageBox.critical(self, "Erro de Impressão", str(e))
         self.accept()
+
+    def _do_save(self):
+        if self.order is None:
+            self.accept()
+            return
+        order_service.set_order_instructions(self.order["id"], self.cart.note.text().strip())
+        self.accept()
+
+    def _transfer_table(self):
+        if self.order is None:
+            return
+        free = [t for t in table_service.list_all() if t["status"] == "free"]
+        free = [t for t in free if t["id"] != self.table["id"]]
+        if not free:
+            QMessageBox.information(self, "Transferir Mesa", "Não há mesas livres para transferir.")
+            return
+        names = [t["table_no"] for t in free]
+        name, ok = QInputDialog.getItem(self, "Transferir Mesa",
+                                        "Para qual mesa livre?", names, 0, False)
+        if not ok or not name:
+            return
+        dest = next(t for t in free if t["table_no"] == name)
+        try:
+            order_service.transfer_order(self.order["id"], dest["id"])
+        except ValueError as e:
+            QMessageBox.warning(self, "Transferir Mesa", str(e))
+            return
+        self.table["id"] = dest["id"]
+        self.table["table_no"] = dest["table_no"]
+        self.setWindowTitle(f"Mesa {dest['table_no']}")
+        QMessageBox.information(self, "Transferir Mesa",
+                                f"Pedido movido para a mesa {dest['table_no']}.")
+
+    def _merge_table(self):
+        if self.order is None:
+            return
+        others = [t for t in table_service.list_all() if t["status"] != "free"]
+        others = [t for t in others if t["id"] != self.table["id"]]
+        if not others:
+            QMessageBox.information(self, "Juntar Contas", "Nenhuma outra mesa com pedido aberto.")
+            return
+        names = [t["table_no"] for t in others]
+        name, ok = QInputDialog.getItem(self, "Juntar Contas",
+                                        "Unir a conta de qual mesa nesta?", names, 0, False)
+        if not ok or not name:
+            return
+        src = next(t for t in others if t["table_no"] == name)
+        src_order = order_service.get_open_order_for_table(src["id"])
+        if not src_order:
+            QMessageBox.information(self, "Juntar Contas", "A mesa selecionada não tem pedido aberto.")
+            return
+        resp = QMessageBox.question(
+            self, "Juntar Contas",
+            f"Mover os itens da mesa {name} para esta mesa "
+            f"({self.table['table_no']})? A mesa {name} será liberada.",
+        )
+        if resp != QMessageBox.Yes:
+            return
+        try:
+            order_service.merge_orders(src_order["id"], self.order["id"])
+        except ValueError as e:
+            QMessageBox.warning(self, "Juntar Contas", str(e))
+            return
+        self.cart.refresh()
+        QMessageBox.information(self, "Juntar Contas", "Contas unidas com sucesso.")
 
     def _do_final_bill(self):
         order = self._ensure_order()
         if not order_service.get_items(order["id"]):
-            QMessageBox.information(self, "Empty Order", "Add items before final bill.")
+            QMessageBox.information(self, "Pedido Vazio", "Adicione itens antes da conta final.")
             return
         method = self.payment.currentText()
+        if method == "Dinheiro":
+            cur = settings_service.get("currency", "R$")
+            total = float(self.order["total"])
+            received, ok1 = QInputDialog.getDouble(
+                self, "Pagamento em Dinheiro",
+                f"Total da conta: {fmt_money(total, cur)}\n\nValor recebido do cliente:",
+                total, total, 100000000, 2,
+            )
+            if not ok1:
+                return
+            troco = round(received - total, 2)
+            QMessageBox.information(
+                self, "Troco",
+                f"Valor recebido: {fmt_money(received, cur)}\n"
+                f"Total da conta: {fmt_money(total, cur)}\n"
+                f"Troco a devolver: {fmt_money(troco, cur)}",
+            )
         resp = QMessageBox.question(
-            self, "Confirm Payment",
-            f"Close this bill and print Final Bill?\n\nTotal: {self.cart.t_total.text()}\nPayment: {method}",
+            self, "Confirmar Pagamento",
+            f"Fechar esta conta e imprimir a conta final?\n\nTotal: {self.cart.t_total.text()}\nPagamento: {method}",
         )
         if resp != QMessageBox.Yes:
             return
@@ -184,14 +306,14 @@ class TablePopup(QDialog):
         try:
             print_final_bill(order_service.get(order["id"]))
         except Exception as e:
-            QMessageBox.critical(self, "Print Error", str(e))
+            QMessageBox.critical(self, "Erro de Impressão", str(e))
         self.accept()
 
     def _do_manual_close(self):
         if self.order is not None and order_service.get_items(self.order["id"]):
             resp = QMessageBox.question(
-                self, "Close Table",
-                "Table has items but no payment will be recorded. Close anyway?",
+                self, "Fechar Mesa",
+                "A mesa tem itens, mas nenhum pagamento será registrado. Fechar mesmo assim?",
             )
             if resp != QMessageBox.Yes:
                 return

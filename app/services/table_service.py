@@ -15,7 +15,7 @@ class TableService:
 
     def add(self, table_no, seats):
         if self._db.fetchone("SELECT id FROM tables WHERE table_no=?", (table_no,)):
-            raise ValueError("Table number already exists.")
+            raise ValueError("Número de mesa já existe.")
         self._db.execute(
             "INSERT INTO tables (table_no, seats) VALUES (?,?)", (table_no, seats)
         )
@@ -25,7 +25,7 @@ class TableService:
             "SELECT id FROM tables WHERE table_no=? AND id!=?", (table_no, table_id)
         )
         if row:
-            raise ValueError("Table number already exists.")
+            raise ValueError("Número de mesa já existe.")
         self._db.execute(
             "UPDATE tables SET table_no=?, seats=? WHERE id=?", (table_no, seats, table_id)
         )
@@ -33,7 +33,7 @@ class TableService:
     def delete(self, table_id):
         row = self._db.fetchone("SELECT status FROM tables WHERE id=?", (table_id,))
         if row and row["status"] != "free":
-            raise ValueError("Occupied tables cannot be deleted.")
+            raise ValueError("Não é possível excluir mesas ocupadas.")
         self._db.execute("DELETE FROM tables WHERE id=?", (table_id,))
 
     def get(self, table_id):

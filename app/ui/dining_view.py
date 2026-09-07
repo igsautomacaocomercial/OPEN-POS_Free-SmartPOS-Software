@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 from app.services.table_service import table_service
 from app.ui.icons import icon_pixmap, make_icon
 from app.ui.table_popup import TablePopup
-from app.utils.helpers import fmt_datetime
+from app.utils.helpers import fmt_datetime, fmt_money
 
 STATUS_COLORS = {
     "free": "#10b981",
@@ -16,9 +16,9 @@ STATUS_COLORS = {
 }
 
 STATUS_TEXT = {
-    "free": "FREE",
-    "occupied": "OCCUPIED",
-    "request_bill": "REQUEST BILL",
+    "free": "LIVRE",
+    "occupied": "OCUPADA",
+    "request_bill": "PEDINDO CONTA",
 }
 
 
@@ -35,15 +35,15 @@ class DiningView(QWidget):
 
         head = QHBoxLayout()
         t = QVBoxLayout()
-        title = QLabel("Dining")
+        title = QLabel("Salão")
         title.setObjectName("PageTitle")
-        subtitle = QLabel("Tap a table to open the order screen")
+        subtitle = QLabel("Toque numa mesa para abrir o pedido")
         subtitle.setObjectName("PageSubtitle")
         t.addWidget(title)
         t.addWidget(subtitle)
         head.addLayout(t)
         head.addStretch()
-        self.refresh_btn = QPushButton("   Refresh")
+        self.refresh_btn = QPushButton("   Atualizar")
         self.refresh_btn.setIcon(make_icon("refresh", "#4b5563", 24))
         self.refresh_btn.setIconSize(QSize(18, 18))
         self.refresh_btn.clicked.connect(self.refresh)
@@ -108,7 +108,7 @@ class DiningView(QWidget):
         seats_ic = QLabel()
         seats_ic.setPixmap(icon_pixmap("user", "#ffffff", 14))
         top.addWidget(seats_ic)
-        seats = QLabel(f"{table['seats']} seats")
+        seats = QLabel(f"{table['seats']} lugares")
         seats.setStyleSheet("color: rgba(255,255,255,0.95); font-weight: 600;")
         top.addWidget(seats)
         lay.addLayout(top)
@@ -131,7 +131,7 @@ class DiningView(QWidget):
             wrow.addStretch()
             lay.addLayout(wrow)
         if table["current_total"]:
-            tot = QLabel(f"Total: {table['current_total']:,.2f}")
+            tot = QLabel(f"Total: {fmt_money(table['current_total'])}")
             tot.setStyleSheet("color: rgba(255,255,255,0.95); font-size: 12px; font-weight: 800;")
             lay.addWidget(tot)
         if table["opened_at"]:

@@ -1,4 +1,4 @@
-from PySide6.QtCore import QEvent, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu, QPlainTextEdit,
@@ -9,30 +9,34 @@ from app.services.settings_service import settings_service
 from app.ui.dashboard_view import DashboardView
 from app.ui.dining_view import DiningView
 from app.ui.expenses_view import ExpensesView
+from app.ui.finance_view import FinanceView
 from app.ui.icons import icon_pixmap, make_icon
 from app.ui.pos_view import PosView
 from app.ui.products_view import ProductsView
 from app.ui.reports_view import ReportsView
+from app.ui.auxiliaries_view import AuxiliariesView
 from app.ui.settings_view import SettingsView
 from app.utils.crash_guard import get_logger
 
 log = get_logger()
 
-ROLE_LABELS = {"admin": "Administrator", "manager": "Manager", "cashier": "Cashier"}
+ROLE_LABELS = {"admin": "Administrador", "manager": "Gerente", "cashier": "Caixa"}
 
 NAV = [
-    ("dashboard", "dashboard", "Dashboard"),
-    ("pos", "bag", "Quick Sale"),
-    ("dining", "table", "Dining"),
-    ("products", "cup", "Products"),
-    ("expenses", "coins", "Expenses"),
-    ("reports", "chart", "Reports"),
-    ("settings", "sliders", "Settings"),
+    ("dashboard", "dashboard", "Painel"),
+    ("pos", "bag", "Venda Rápida"),
+    ("dining", "table", "Salão"),
+    ("products", "cup", "Produtos"),
+    ("expenses", "coins", "Despesas"),
+    ("finance", "card", "Financeiro"),
+    ("reports", "chart", "Relatórios"),
+    ("settings", "sliders", "Configurações"),
+    ("auxiliares", "grid", "Auxiliares"),
 ]
 
 ROLE_ACCESS = {
-    "admin": {"dashboard", "pos", "dining", "products", "expenses", "reports", "settings"},
-    "manager": {"dashboard", "pos", "dining", "products", "expenses", "reports"},
+    "admin": {"dashboard", "pos", "dining", "products", "expenses", "finance", "reports", "settings", "auxiliares"},
+    "manager": {"dashboard", "pos", "dining", "products", "expenses", "finance", "reports", "auxiliares"},
     "cashier": {"dashboard", "pos", "dining", "expenses"},
 }
 
@@ -50,6 +54,7 @@ class MainWindow(QMainWindow):
         self.allowed = ROLE_ACCESS.get(self.user.get("role"), {"dashboard"})
         self._build()
         QShortcut(QKeySequence("F11"), self, activated=self._toggle_fullscreen)
+        QTimer.singleShot(6000, self._auto_backup)
 
     def _build(self):
         central = QWidget()
@@ -77,7 +82,7 @@ class MainWindow(QMainWindow):
         if logo_path:
             icon.setPixmap(QPixmap(logo_path).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
-            icon.setPixmap(icon_pixmap("cup", "#4f46e5", 32))
+            icon.setPixmap(icon_pixmap("cup", "#ea580c", 32))
         icon.setAlignment(Qt.AlignCenter)
         bl.addWidget(icon)
         name = QLabel(settings_service.get("store_name", "Open POS"))
@@ -93,7 +98,7 @@ class MainWindow(QMainWindow):
         b_collapse.setFixedSize(36, 36)
         b_collapse.setIcon(make_icon("panel", "#4b5563", 24))
         b_collapse.setIconSize(QSize(18, 18))
-        b_collapse.setToolTip("Collapse sidebar")
+        b_collapse.setToolTip("Recolher menu")
         b_collapse.clicked.connect(lambda: self._collapse_sidebar())
         tools.addWidget(b_collapse)
         b_fullscreen = QPushButton()
@@ -101,7 +106,7 @@ class MainWindow(QMainWindow):
         b_fullscreen.setFixedSize(36, 36)
         b_fullscreen.setIcon(make_icon("expand", "#4b5563", 24))
         b_fullscreen.setIconSize(QSize(18, 18))
-        b_fullscreen.setToolTip("Fullscreen (F11)")
+        b_fullscreen.setToolTip("Tela cheia (F11)")
         b_fullscreen.clicked.connect(lambda: self._toggle_fullscreen())
         tools.addWidget(b_fullscreen)
         sl.addLayout(tools)
@@ -145,7 +150,7 @@ class MainWindow(QMainWindow):
         b_expand.setFixedSize(40, 40)
         b_expand.setIcon(make_icon("panel", "#4b5563", 24))
         b_expand.setIconSize(QSize(18, 18))
-        b_expand.setToolTip("Expand sidebar")
+        b_expand.setToolTip("Expandir menu")
         b_expand.clicked.connect(lambda: self._expand_sidebar())
         rl.addWidget(b_expand)
         self.rail_buttons = {}
@@ -191,8 +196,14 @@ class MainWindow(QMainWindow):
             return ProductsView()
         if key == "expenses":
             return ExpensesView()
+        if key == "finance":
+            return FinanceView()
         if key == "reports":
             return ReportsView()
+        if key == "auxiliares":
+            v = AuxiliariesView()
+            v.reload()
+            return v
         if key == "settings":
             v = SettingsView()
             v.reload()
@@ -224,6 +235,27 @@ class MainWindow(QMainWindow):
         self.rail.setVisible(False)
         self.sidebar.setVisible(True)
 
+    def _auto_backup(self):
+        try:
+            import datetime
+            from pathlib import Path
+            from app.config import DATA_DIR
+            from app.database.db import get_db
+            if settings_service.get("auto_backup", "0") != "1":
+                return
+            hours = float(settings_service.get_float("auto_backup_hours", 24) or 24)
+            backup_dir = Path(DATA_DIR) / "backups"
+            backup_dir.mkdir(exist_ok=True)
+            now = datetime.datetime.now()
+            for f in sorted(backup_dir.glob("openpos_backup_*.db"), reverse=True):
+                age = (now - datetime.datetime.fromtimestamp(f.stat().st_mtime)).total_seconds() / 3600.0
+                if age <= hours:
+                    return
+            get_db().backup()
+            log.info("Backup automático concluído")
+        except Exception:
+            log.exception("Falha no backup automático")
+
     def _toggle_fullscreen(self):
         if self.isFullScreen():
             self.showNormal()
@@ -245,7 +277,7 @@ class MainWindow(QMainWindow):
         role.setStyleSheet("color: #6b7280; font-size: 12px;")
         lay.addWidget(who)
         lay.addWidget(role)
-        logout = QPushButton("   Logout")
+        logout = QPushButton("   Sair")
         logout.setIcon(make_icon("power", "#dc2626", 24))
         logout.setIconSize(QSize(18, 18))
         logout.setStyleSheet(
@@ -265,7 +297,7 @@ class MainWindow(QMainWindow):
         except Exception:
             log.exception("Error in %s.%s", type(view).__name__, method)
             self.statusBar().showMessage(
-                "Something went wrong while loading this page. See logs for details.", 6000
+                "Ocorreu um erro ao carregar esta página. Veja os logs para detalhes.", 6000
             )
 
     def switch_page(self, key):
@@ -294,7 +326,7 @@ class MainWindow(QMainWindow):
 
     def _show_refresh_menu(self, pos):
         menu = QMenu(self)
-        act = menu.addAction(make_icon("refresh", "#4f46e5", 24), "  Refresh")
-        act.setToolTip("Reload all pages and settings")
+        act = menu.addAction(make_icon("refresh", "#ea580c", 24), "  Atualizar")
+        act.setToolTip("Recarregar páginas e configurações")
         act.triggered.connect(self.refresh_all)
         menu.exec(pos)

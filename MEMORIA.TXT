@@ -1,0 +1,285 @@
+========================================================
+MEMORIA DO PROJETO
+Projeto: Open POS (Free SmartPOS Software) - PySide6
+Caminho: OPEN-POS_Free-SmartPOS-Software
+========================================================
+
+OBJETIVO
+--------
+Traduzir a interface do sistema para portugues (pt-BR) e validar o
+funcionamento completo da aplicacao (compile, banco reseed, execucao,
+login).
+
+--------------------------------------------------------
+TRABALHO CONCLUIDO (2026-09-07)
+--------------------------------------------------------
+
+1) app/ui/reports_view.py  -> TRADUZIDO POR COMPLETO
+   - TYPE_LABELS (No Local / Para Viagem / Delivery)
+   - PRESETS de datas e abas (Vendas, Lucro & Prejuizo, Produtos,
+     Desempenho da Equipe, Despesas, Pagamentos)
+   - Cards de estatistica, graficos e tabelas (6 tipos de relatorio)
+   - Demonstrativo P&L (Vendas Brutas, Descontos, Taxas de Servico,
+     Vendas Liquidas, Imposto, Total Recebido, CMV, Lucro Bruto,
+     Despesas Operacionais, LUCRO/PREJUIZO LIQUIDO)
+   - Export: arquivo "relatorio_{data}.csv", msg "Exportado"/"Salvo em"
+   - Chamadas staff_performance com papeis pt-BR ("Garcom"/"Entregador")
+   - Moeda "R$"
+
+2) app/ui/settings_view.py  -> TRADUZIDO
+   - ROLE_OPTIONS (dict admin/manager/cashier) no lugar da lista ROLES
+   - Combo de usuarios mostra pt e salva codigo por indice
+   - Todas as abas, formularios, mensagens e headers em pt-BR
+   - Labels do form de usuario: "Nome:"/"Papel:"
+
+3) app/ui/charts.py  -> "No data" vira "Sem dados"
+
+4) app/ui/pos_view.py  -> RECUPERADO E TRADUZIDO
+   - Arquivo estava corrompido (classe duplicada em ingles + string
+     truncada na linha 178). Removido bloco duplicado/mutilado.
+   - Estado final: 529 linhas, sintaxe OK.
+   - Classes: OrderDetailDialog, QuickSalePage, PosView (Venda Rapida
+     com abas Para Viagem / Delivery), tudo em pt-BR.
+   - Taxa com fmt_money e moeda "R$".
+
+5) Outros arquivos ja traduzidos em sessao anterior:
+   helpers.py, db.py, services, printer, login, main_window,
+   dashboard, dining, table_popup, cart_panel, products, expenses.
+
+2. TRABALHO CONCLUIDO (2026-09-07 - FASE 2: AUXILIARES)
+   - Nova tela app/ui/auxiliaries_view.py (menu Auxiliares) com abas:
+     Mesas, Clientes, Bairros, Entregadores, Formas de Pagamento,
+     Categorias, Equipe, Usuarios.
+   - db.py: tabelas customers, neighborhoods, payment_methods;
+     colunas orders.customer_id e orders.neighborhood_id; seed de
+     formas de pagamento (Dinheiro/Cartao/Pix); backup inclui as
+     novas tabelas; rebind_services com aux_service.
+   - app/services/aux_service.py: CustomerService (busca por
+     telefone), NeighborhoodService (bairro x taxa de entrega),
+     PaymentMethodService (formas configuraveis).
+   - settings_view.py: abas Mesas/Equipe/Usuarios MOVIDAS para
+     Auxiliares (removidas daqui + imports limpos). Abas restantes:
+     Loja, Gestao de Impostos, Impressao, Backup / Restaurar.
+   - main_window.py: item de navegacao "Auxiliares" (icon grid),
+     permissao para admin e manager.
+   - icons.py: novos desenhos grid, map, bike, users, card, basket.
+   - pos_view.py (editado SOMENTE via PowerShell):
+     * Delivery: busca de cliente por telefone (auto-preenche nome/
+       endereco) + botao "Cadastrar Cliente".
+     * Seletor de Bairro com taxa de entrega automatica no pedido.
+     * Conclusao com escolha da forma de pagamento (lista dinamica).
+   - order_service.py: create_order aceita customer_id/
+     neighborhood_id; novos set_service_charge e set_customer_info.
+   - table_popup.py (mesa): botao "Salvar" (mantem mesa aberta para
+     o cliente continuar consumindo); botao renomeado para
+     "Fechar Mesa (Sem Pagamento)" (evita confusao com a conta
+     final); combo de pagamento dinamico.
+   - theme.py: skin padrao mantida com acento quente sutil
+     (terracota #ea580c no lugar do indigo) - nada exagerado.
+   - Validacao: compileall OK, imports OK, smoke test offscreen OK
+     (Auxiliares, PosView, SettingsView, services),
+     app reiniciado com log "Database OK".
+
+--------------------------------------------------------
+DECISOES / CONVENCOES
+--------------------------------------------------------
+- Chaves internas permanecem em ingles (papel admin/manager/cashier;
+  status free/occupied/request_bill; order type dine-in/takeaway/
+  delivery; discount_type amount/percent). A UI mostra pt via
+  addItem(label, data)/currentData().
+- Pagamentos/staff gravados em pt-BR: Dinheiro/Cartao/Pix;
+  Garcom/Chefe de Sala/Auxiliar/Entregador.
+- Linha do recibo (BRANDING_LINE) mantida em ingles.
+- Login padrao: admin / admin123.
+
+--------------------------------------------------------
+SOLICITACOES DO USUARIO (BACKLOG - preencher conforme chegar)
+--------------------------------------------------------
+Data: 2026-09-07
+O usuario envia ideias aqui e vamos implementando juntos.
+
+[x] 1. DELIVERY - LOCALIZAR CLIENTE PELO TELEFONE
+    - Ao digitar o numero do telefone do cliente no pedido de delivery,
+      buscar automaticamente no cadastro de clientes.
+    - Se encontrar: preencher nome/endereco automaticamente.
+    - Se nao encontrar: exibir opcao "Cadastrar Cliente".
+
+[x] 2. CADASTROS AUXILIARES
+    - Criar modulo/tela de cadastros auxiliares para poder registrar:
+      * Bairros e suas taxas de entrega (bairro -> taxa)
+      * Categorias
+    - Usar esses cadastros dentro dos pedidos de delivery.
+
+[x] 3. FORMAS DE PAGAMENTO
+    - Hoje e fixo: Dinheiro / Cartao / Pix.
+    - Criar lista configuravel de formas de pagamento.
+
+[x] 4. ICONES LEGAIS
+    - Usar icones bonitos que combinem com o menu, grupos e setores.
+
+[x] 5. MENU AUXILIARES
+    - Reunir em um menu 'Auxiliares': Mesas, Equipe, Usuarios
+      e os novos cadastros (bairros, categorias, etc.).
+
+
+[x] 6. CADASTRO DE MOTOQUEIRO (ENTREGADOR)
+    - Cadastro de motoqueiros e controle de quem levou/faz a entrega
+      (linkar entregador ao pedido de delivery).
+
+[x] 7. SKIN / TEMA - RAMO ALIMENTICIO
+    - Ajustar visual para combinar com alimentacao, mas manter algo
+      PADRAO/simples (nada exagerado).
+
+[ ] 6a. OBS 2026-09-07: ENTREGADOR = MOTOQUEIRO
+    - Confirmado pelo usuario: o entregador ja e o motoqueiro.
+    - Usar o papel 'Entregador' da Equipe (staff), que ja e
+      referenciado em orders.rider_id. NAO criar tabela separada.
+
+[x] 8. FINANCEIRO (evolucao do menu Despesas)
+    - Renomear 'Despesas' para 'Financeiro' com submenu:
+      * Caixa - filtro de TODOS os caixas / CAIXA ATUAL
+      * Abertura de Caixa (abertura com valor inicial)
+      * Sangria (retirada)
+      * Reforco de Caixa (suprimento)
+      * Contas a Pagar e Receber
+    - Viabilidade: media-alta; exige novas tabelas (caixa_movements,
+      contas) + relatorios. Sugestao: implementar DEPOIS da fase de
+      cadastros auxiliares. Colher mais detalhes (fluxo de troca de
+      turno, permissao, impressao de abertura/fechamento).
+
+--------------------------------------------------------
+TRABALHO CONCLUIDO - MELHORIAS ROUND 2 (2026-09-07)
+--------------------------------------------------------
+1) PAINEL (dashboard_view.py)
+   - Duas novas colunas abaixo dos cards/grafico:
+     * Produtos Mais Vendidos (Hoje): top 5 por quantidade/receita
+     * Formas de Pagamento (Hoje): forma, pedidos e valor total
+   - Dados via report_service.product_rank / payment_breakdown.
+2) SALAO - TRANSFERIR / JUNTAR (order_service + table_popup)
+   - order_service.transfer_order(origem, destino): move o pedido e
+     ajusta status das mesas (origem livre, destino ocupada).
+   - order_service.merge_orders(origem, destino): move itens da mesa
+     de origem para a de destino e fecha/libera a origem.
+   - TablePopup: botoes 'Transferir Mesa' e 'Juntar Contas' (dialogos
+     com lista das mesas livres/ocupadas).
+3) RELATORIOS - EXPORTAR (reports_view.py)
+   - Refatorado _export_data() (titulo, headers, linhas) por aba.
+   - Botoes 'Exportar Excel' (openpyxl, .xlsx) e 'Exportar PDF'
+     (QTextDocument -> QPrinter, QtPrintSupport; cabecalho com nome da
+     loja) alem do CSV existente.
+4) TROCO AUTOMATICO (pos_view._complete + TablePopup._do_final_bill)
+   - Se pagamento = 'Dinheiro': pergunta o valor recebido (default = total)
+     e mostra o troco antes de finalizar a venda.
+6) BACKUP AGENDADO
+   - Configuracoes > Backup/Restaurar: card 'Backup AutomÃƒÆ’Ã‚Â¡tico' (ativo +
+     intervalo h, chaves auto_backup / auto_backup_hours).
+   - MainWindow: _auto_backup() roda 6s apos abrir, cria backup na pasta
+     data/backups se o ultimo for mais antigo que o intervalo.
+FIX: FORMAS DE PAGAMENTO NAS MESAS
+   - popup de mesa usava combo fixo ['Dinheiro','Cartao','Pix']; agora usa
+     payment_service.list_active_names() (fallback p/ o fixo se vazio).
+PLANO DE CONTAS (AUXILIARES + FINANCEIRO)
+   - Nova tabela chart_accounts (code, name, type entrada/saida, is_active,
+     sort_order; UNIQUE(code,name)); migracao adicionou account_id em
+     accounts_payable e accounts_receivable (bancos ja existentes).
+   - app/services/chart_account_service.py (add/update/delete com guarda
+     de vinculo em lancamentos; nao permite excluir conta em uso).
+   - Auxiliares > Plano de Contas: cadastro rapido (Codigo/Nome/Tipo) +
+     tabela e acoes Editar / Ativar-Desativar / Excluir.
+   - Financeiro: dialog de Contas a Pagar/Receber ganhou combo 'Plano de
+     Contas'; tabelas mostram a conta vinculada (LEFT JOIN, account_name).
+   - backup(): _validate_backup agora exige chart_accounts.
+VALIDACAO: py_compile OK; smoke offscreen OK (transfer/merge, dashboard,
+export xlsx/pdf, plano de contas, financeiro); app reiniciado 'Database OK'.
+
+
+CONFERENCIA VISUAL (via OCR/click - 2026-09-07)
+------------------------------------------------
+- App reiniciado; janela "Open POS - ismael" maximizada e logada.
+- Auxiliares > Plano de Contas: aba OK com formulario Codigo/Nome/Tipo
+  (Entrada/Saida), placeholder "Ex.: 1.1" / "Ex.: Vendas de Cafe", tabela
+  Codigo/Nome/Tipo/Ativo e botoes Editar / Ativar-Desativar / Excluir.
+  Contas ja cadastradas no ambiente: Aluguel, Agua, Energia, Internet, IPTU.
+- Financeiro > Contas a Pagar: coluna "Conta" presente na tabela (JUNTO de
+  Vencimento/Descricao/Valor/Status/Paga em).
+- Dialog "Adicionar Conta a Pagar": combo "Plano de Contas" lista ativas
+  (-- Sem Conta --, Aluguel, Agua, Energia, Internet, IPTU) -> OK.
+- Caixa / Contas a Receber nao testados visualmente nesta rodada (mesma
+  codificacao; smoke cobriu).
+- Nenhuma regressao visual nas telas conferidas.
+
+SUGESTOES (proximas etapas, nao executadas)
+-------------------------------------------
+- (Fornecedores/Clientes PJ ja implementados com Busca na Receita e
+  Busca de CEP via Brasil API no showroom de Clientes e Fornecedores.)
+--------------------------------------------------------
+VALIDACAO (2026-09-07)
+--------------------------------------------------------
+- compileall app main.py  -> OK
+- data\openpos.db removido e recriado (reseed)
+- App inicializado: log "Database OK"
+- Login admin/admin123 validado via verify_password (True)
+
+--------------------------------------------------------
+OBSERVACOES TECNICAS
+--------------------------------------------------------
+- CRLF: ai-workstation_edit_file falha em buscas multilinha; usar
+  edicao de linha unica ou PowerShell (WriteAllLines UTF-8 sem BOM).
+- IMPORTANTE: o edit_file do MCP pode reverter alteracoes feitas via
+  PowerShell no mesmo arquivo (cache). Desde que pos_view.py precisou
+  de cirurgia (PowerShell), ele deve ser editado SOMENTE via
+  PowerShell; verificar com ast.parse apos editar.
+- Verificar sempre com:
+    .\venv\Scripts\python.exe -c "import ast; ast.parse(open(r'<arquivo>', encoding='utf-8').read())"
+
+PENDENCIAS
+----------
+- Revisor visual rapido da UI (opcional): abrir cada tela e conferir
+  que nenhum texto em ingles ficou em tooltip/statusbar.
+- Este arquivo deve ser atualizado a cada novo trabalho no projeto.
+========================================================
+
+--------------------------------------------------------
+TRABALHO CONCLUIDO (2026-09-07 - CLIENTES/FORNECEDORES)
+--------------------------------------------------------
+1) db.py: coluna customers.is_active (INTEGER NOT NULL DEFAULT 1) na
+   schema + migracao _migrate (coluna nova em banco existente).
+2) aux_service.py:
+   - CustomerService.list_all(include_inactive=True), list_active(),
+     find_by_phone(phone, active_only=True), search(term,
+     include_inactive=True), add(..., is_active=True),
+     update(..., is_active=None -> preserva atual), set_active(id, bool).
+   - SupplierService.list_all/search(term, include_inactive=True).
+   - FIX SQL PRECEDENCIA: busca com termo usava "name LIKE ? OR phone LIKE ?
+     OR doc LIKE ? AND ativo" (AND amarrando ao ultimo OR). Corrigido com
+     parenteses "(name LIKE ? OR phone LIKE ? OR doc LIKE ?)" em
+     customers e suppliers; mesmo fix em find_by_phone.
+3) order_service.list_by_customer(customer_id, limit=500): historico de
+   pedidos de um cliente (joins tabela/mesa/garcom).
+4) auxiliaries_view.py: abas Clientes e Fornecedores REDESENHADAS:
+   - Grade paginada (AUX_PAGE_SIZE=50, paginacao em memoria) com
+     Anterior/Pagina/A-Proxima, busca + checkbox "Mostrar inativos".
+   - Botoes Novo / Editar / Inativar / Excluir (+ Ficha & Historico para
+     clientes).
+   - "Novo"/"Editar" abrem dialog showroom com Codigo automatico
+     (ou #id), Nome, Documento (+Buscar na Receita), Telefone, E-mail,
+     CEP (+Buscar CEP), Endereco, Bairro, Cidade, UF, Observacoes.
+   - Ficha do Cliente (botao ou duplo-clique na linha): dialog com abas
+     "Dados do Cliente" (read-only) e "Historico de Pedidos" (Nr Pedido,
+     Data, Tipo, Mesa, Status, Pagamento, Total) + resumo do total pago.
+   - Atributos preservados p/ smoke: customers_table, suppliers_table,
+     c_search, s_search; novos: c_prev/c_next/c_info, s_prev/s_next/s_info,
+     c_show_inactive/s_show_inactive.
+5) pos_view._register_customer: usa find_by_phone(phone, active_only=False)
+   e update(..., is_active=True) para reativar cliente inativo com mesmo
+   telefone (evita UNIQUE + mantem cadastro).
+6) Validacao: py_compile app inteiro OK; smoke_fornecedores.py ampliado
+   (is_active/set_active, active_only, "Mostrar inativos", list_by_customer,
+   paginacao) -> SMOKE OK; regressoes smoke_items/smoke_planocontas OK;
+   app reiniciado e logado (admin/admin123) com conferencia visual via OCR:
+   grid paginada, dialog showroom, ficha com abas, inativacao e "Mostrar
+   inativos" funcionando.
+
+DECISAO DO USUARIO: padrao de grade paginada + formulario showroom para
+CLIENTES E FORNECEDORES; "Inativar" esconde o registro do seletor de venda
+e das listagens padrao (aparece so com "Mostrar inativos").

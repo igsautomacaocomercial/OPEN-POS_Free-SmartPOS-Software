@@ -35,7 +35,7 @@ QMainWindow, QDialog {
     color: #111827;
 }
 #NavButton:checked {
-    background: #4f46e5;
+    background: #ea580c;
     color: #ffffff;
 }
 #PageTitle {
@@ -63,11 +63,11 @@ QLineEdit, QTextEdit, QSpinBox, QDoubleSpinBox, QComboBox, QDateEdit {
     border: 1.5px solid #d1d5db;
     border-radius: 9px;
     padding: 8px 11px;
-    selection-background-color: #4f46e5;
+    selection-background-color: #ea580c;
 }
 QLineEdit:focus, QTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus,
 QComboBox:focus, QDateEdit:focus {
-    border: 1.5px solid #4f46e5;
+    border: 1.5px solid #ea580c;
 }
 QComboBox::drop-down {
     border: none;
@@ -77,7 +77,7 @@ QComboBox QAbstractItemView {
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
-    selection-background-color: #eef2ff;
+    selection-background-color: #fff4ed;
     selection-color: #111827;
     padding: 4px;
 }
@@ -97,12 +97,12 @@ QPushButton:pressed {
     background: #eef1f7;
 }
 QPushButton[primary="true"] {
-    background: #4f46e5;
+    background: #ea580c;
     color: #ffffff;
-    border: 1.5px solid #4f46e5;
+    border: 1.5px solid #ea580c;
 }
 QPushButton[primary="true"]:hover {
-    background: #4338ca;
+    background: #c2410c;
 }
 QPushButton[danger="true"] {
     background: #ef4444;
@@ -141,7 +141,7 @@ QTableWidget, QTableView {
     border: 1px solid #e5e7eb;
     border-radius: 12px;
     gridline-color: #f1f3f7;
-    selection-background-color: #eef2ff;
+    selection-background-color: #fff4ed;
     selection-color: #111827;
 }
 QHeaderView::section {
@@ -204,9 +204,9 @@ QTabBar::tab {
 }
 QTabBar::tab:selected {
     background: #ffffff;
-    color: #4f46e5;
+    color: #ea580c;
     border: 1px solid #e5e7eb;
-    border-bottom: 2px solid #4f46e5;
+    border-bottom: 2px solid #ea580c;
 }
 QTabBar::tab:hover:!selected {
     color: #111827;
@@ -232,8 +232,8 @@ QTabBar::tab:hover:!selected {
     border-radius: 12px;
 }
 #ProductCard:hover {
-    border-color: #4f46e5;
-    background: #fbfaff;
+    border-color: #ea580c;
+    background: #fff7ed;
 }
 #ProductName {
     font-size: 13px;
@@ -243,7 +243,7 @@ QTabBar::tab:hover:!selected {
 #ProductPrice {
     font-size: 13px;
     font-weight: 800;
-    color: #4f46e5;
+    color: #ea580c;
 }
 #TableCard {
     border-radius: 16px;
@@ -281,9 +281,9 @@ QTabBar::tab:hover:!selected {
     color: #4b5563;
 }
 #ChipButton:checked {
-    background: #4f46e5;
+    background: #ea580c;
     color: #ffffff;
-    border-color: #4f46e5;
+    border-color: #ea580c;
 }
 #QtyBtn {
     min-width: 28px;

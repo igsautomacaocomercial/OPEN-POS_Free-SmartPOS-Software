@@ -13,17 +13,17 @@ class StaffService:
 
     def list_waiters(self):
         return self._db.fetchall(
-            "SELECT * FROM staff WHERE is_active=1 AND role != 'Rider' ORDER BY name"
+            "SELECT * FROM staff WHERE is_active=1 AND role != 'Entregador' ORDER BY name"
         )
 
     def list_riders(self):
         return self._db.fetchall(
-            "SELECT * FROM staff WHERE is_active=1 AND role='Rider' ORDER BY name"
+            "SELECT * FROM staff WHERE is_active=1 AND role='Entregador' ORDER BY name"
         )
 
     def add(self, name, role, phone=""):
         self._db.execute(
-            "INSERT INTO staff (name, role, phone) VALUES (?,?,?)", (name, role, phone)
+            "INSERT INTO staff (name, role, phone, is_active) VALUES (?,?,?,1)", (name, role, phone)
         )
 
     def update(self, staff_id, name, role, phone, is_active=True):

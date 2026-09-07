@@ -26,7 +26,7 @@ class ProductGrid(QScrollArea):
         self.setWidget(container)
         self._buttons = []
 
-    def set_products(self, products, currency="Rs"):
+    def set_products(self, products, currency="R$"):
         for b in self._buttons:
             b.deleteLater()
         self._buttons.clear()
@@ -81,7 +81,7 @@ class CartPanel(QFrame):
         left.setSpacing(10)
         self.search = QLineEdit()
         self.search.setObjectName("SearchBox")
-        self.search.setPlaceholderText("  Search products...")
+        self.search.setPlaceholderText("  Buscar produtos...")
         self.search.addAction(make_icon("search", "#9ca3af", 24), QLineEdit.LeadingPosition)
         self.search.textChanged.connect(self._reload_products)
         left.addWidget(self.search)
@@ -105,11 +105,11 @@ class CartPanel(QFrame):
         right = QVBoxLayout()
         right.setSpacing(10)
         head = QHBoxLayout()
-        title = QLabel("Current Order")
+        title = QLabel("Pedido Atual")
         title.setObjectName("SectionHeader")
         head.addWidget(title)
         head.addStretch()
-        self.count_lbl = QLabel("0 items")
+        self.count_lbl = QLabel("0 itens")
         self.count_lbl.setProperty("muted", True)
         head.addWidget(self.count_lbl)
         right.addLayout(head)
@@ -127,20 +127,22 @@ class CartPanel(QFrame):
         right.addWidget(self.items_area, 1)
 
         self.note = QLineEdit()
-        self.note.setPlaceholderText("  Order / table instructions...")
+        self.note.setPlaceholderText("  Instruções do pedido / mesa...")
         self.note.addAction(make_icon("pencil", "#9ca3af", 24), QLineEdit.LeadingPosition)
         self.note.editingFinished.connect(self._save_note)
         right.addWidget(self.note)
 
         disc_row = QHBoxLayout()
         self.disc_type = QComboBox()
-        self.disc_type.addItems(["Amount", "Percent"])
+        self.disc_type.addItem("Valor", "amount")
+        self.disc_type.addItem("Percentual", "percent")
         self.disc_type.setFixedWidth(90)
         self.disc_type.currentIndexChanged.connect(self._disc_type_changed)
         disc_row.addWidget(self.disc_type)
         self.disc_value = QDoubleSpinBox()
         self.disc_value.setRange(0, 1000000)
         self.disc_value.setDecimals(2)
+        self.disc_value.setPrefix(settings_service.get("currency", "R$") + " ")
         self.disc_value.valueChanged.connect(self._save_discount)
         disc_row.addWidget(self.disc_value, 1)
         right.addLayout(disc_row)
@@ -150,9 +152,10 @@ class CartPanel(QFrame):
         tlay = QVBoxLayout(totals)
         tlay.setContentsMargins(16, 13, 16, 13)
         tlay.setSpacing(7)
+        self.t_tax_lbl = None
         self.t_subtotal = self._total_row(tlay, "Subtotal")
-        self.t_discount = self._total_row(tlay, "Discount")
-        self.t_tax = self._total_row(tlay, "Tax")
+        self.t_discount = self._total_row(tlay, "Desconto")
+        self.t_tax = self._total_row(tlay, "Imposto")
         line = QFrame()
         line.setFixedHeight(1)
         line.setStyleSheet("background: #e5e7eb;")
@@ -166,11 +169,13 @@ class CartPanel(QFrame):
         row = QHBoxLayout()
         row.setSpacing(12)
         lbl = QLabel(label)
+        if label == "Imposto":
+            self.t_tax_lbl = lbl
         font = lbl.font()
         font.setBold(bold)
         lbl.setFont(font)
         lbl.setMinimumHeight(22)
-        val = QLabel("Rs 0.00")
+        val = QLabel("R$ 0,00")
         if value_size:
             vfont = val.font()
             vfont.setPointSizeF(value_size)
@@ -188,7 +193,7 @@ class CartPanel(QFrame):
     def _reload_products(self):
         cat_id = self.chips.property("selected")
         products = product_service.list_active(self.search.text().strip(), cat_id)
-        self.grid.set_products(products, settings_service.get("currency", "Rs"))
+        self.grid.set_products(products, settings_service.get("currency", "R$"))
 
     def load_categories(self):
         while self.chips.count():
@@ -196,7 +201,7 @@ class CartPanel(QFrame):
             w = it.widget()
             if w:
                 w.deleteLater()
-        all_btn = QPushButton("All")
+        all_btn = QPushButton("Todos")
         all_btn.setObjectName("ChipButton")
         all_btn.setCheckable(True)
         all_btn.setChecked(True)
@@ -244,17 +249,20 @@ class CartPanel(QFrame):
         self.disc_value.blockSignals(True)
         self.disc_value.setValue(float(order["discount"] or 0))
         self.disc_value.blockSignals(False)
-        idx = self.disc_type.findText(order["discount_type"].capitalize())
+        idx = self.disc_type.findData(order["discount_type"])
         self.disc_type.setCurrentIndex(max(0, idx))
         self.refresh()
 
     def _reset_totals(self):
-        zero = fmt_money(0, settings_service.get("currency", "Rs"))
+        zero = fmt_money(0, settings_service.get("currency", "R$"))
         self.t_subtotal.setText(zero)
         self.t_discount.setText(zero)
         self.t_tax.setText(zero)
+        if self.t_tax_lbl:
+            self.t_tax_lbl.setVisible(False)
+            self.t_tax.setVisible(False)
         self.t_total.setText(zero)
-        self.count_lbl.setText("0 items")
+        self.count_lbl.setText("0 itens")
 
     def refresh(self):
         self._reload_items()
@@ -269,7 +277,7 @@ class CartPanel(QFrame):
             return
         items = order_service.get_items(self.order_id)
         total_qty = sum(float(i["qty"]) for i in items)
-        self.count_lbl.setText(f"{int(total_qty)} items")
+        self.count_lbl.setText(f"{int(total_qty)} itens")
         for it in items:
             row = self._item_row(it)
             self.items_layout.insertWidget(self.items_layout.count() - 1, row)
@@ -300,7 +308,7 @@ class CartPanel(QFrame):
         note_btn.setObjectName("QtyBtn")
         note_btn.setIcon(make_icon("pencil", "#6b7280", 24))
         note_btn.setIconSize(QSize(14, 14))
-        note_btn.setToolTip("Item note")
+        note_btn.setToolTip("Nota do item")
         del_btn = QPushButton()
         del_btn.setObjectName("QtyBtn")
         del_btn.setIcon(make_icon("close", "#ef4444", 24))
@@ -332,7 +340,7 @@ class CartPanel(QFrame):
         current = next((i for i in items if i["id"] == item_id), None)
         if not current:
             return
-        text, ok = QInputDialog.getText(self, "Item Note", "Instructions for this item:",
+        text, ok = QInputDialog.getText(self, "Nota do Item", "Instruções para este item:",
                                         text=current["instructions"] or "")
         if ok:
             order_service.set_item_instructions(item_id, text)
@@ -350,20 +358,24 @@ class CartPanel(QFrame):
     def _disc_type_changed(self):
         if self.order_id:
             order_service.set_discount(self.order_id, self.disc_value.value(),
-                                       self.disc_type.currentText().lower())
+                                       self.disc_type.currentData())
             self._reload_totals()
 
     def _save_discount(self, value):
         if self.order_id:
-            order_service.set_discount(self.order_id, value, self.disc_type.currentText().lower())
+            order_service.set_discount(self.order_id, value, self.disc_type.currentData())
             self._reload_totals()
 
     def _reload_totals(self):
         if not self.order_id:
             return
         order = order_service.get(self.order_id)
-        currency = settings_service.get("currency", "Rs")
+        currency = settings_service.get("currency", "R$")
         self.t_subtotal.setText(fmt_money(order["subtotal"], currency))
-        self.t_discount.setText(f"- {fmt_money(order['discount'], currency)}" if order["discount"] else "Rs 0.00")
+        self.t_discount.setText(f"- {fmt_money(order['discount'], currency)}" if order["discount"] else "R$ 0,00")
         self.t_tax.setText(fmt_money(order["tax"], currency))
+        if self.t_tax_lbl:
+            vis = order["tax"] > 0
+            self.t_tax_lbl.setVisible(vis)
+            self.t_tax.setVisible(vis)
         self.t_total.setText(fmt_money(order["total"], currency))

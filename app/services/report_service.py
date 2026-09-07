@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from app.database.db import get_db
 from app.services.expense_service import expense_service
 from app.services.settings_service import settings_service
+from app.utils.helpers import fmt_day_label
 
 
 def _filter_where(filters):
@@ -75,7 +76,7 @@ class ReportService:
             result.append(
                 {
                     "date": d,
-                    "label": d.strftime("%d %b"),
+                    "label": fmt_day_label(d),
                     "total": float(r["total"]),
                     "count": r["c"],
                 }
@@ -164,7 +165,7 @@ class ReportService:
     def category_sales(self, start, end, **filters):
         where, params = _filter_where(filters)
         return self._db.fetchall(
-            "SELECT COALESCE(c.name,'Uncategorized') category, "
+            "SELECT COALESCE(c.name,'Sem Categoria') category, "
             "COALESCE(SUM(oi.price*oi.qty),0) revenue, COALESCE(SUM(oi.qty),0) qty "
             "FROM order_items oi "
             "JOIN orders o ON o.id=oi.order_id "
@@ -176,8 +177,8 @@ class ReportService:
             [start, end] + params,
         )
 
-    def staff_performance(self, start, end, role="Waiter", **filters):
-        if role == "Rider":
+    def staff_performance(self, start, end, role="Garçom", **filters):
+        if role == "Entregador":
             return self._db.fetchall(
                 "SELECT COALESCE(w.name,'-') name, COUNT(DISTINCT o.id) orders, "
                 "COALESCE(SUM(o.total),0) revenue, COALESCE(AVG(o.total),0) avg_ticket "
@@ -208,7 +209,7 @@ class ReportService:
 
     def list_waiters(self):
         return self._db.fetchall(
-            "SELECT id, name FROM staff WHERE is_active=1 AND role='Waiter' ORDER BY name"
+            "SELECT id, name FROM staff WHERE is_active=1 AND role='Garçom' ORDER BY name"
         )
 
     def today(self):

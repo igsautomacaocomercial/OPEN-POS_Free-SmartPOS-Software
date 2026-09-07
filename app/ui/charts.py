@@ -5,7 +5,7 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
 PALETTE = [
-    "#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+    "#ea580c", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
     "#ec4899", "#14b8a6", "#3b82f6", "#f97316", "#84cc16",
 ]
 
@@ -38,7 +38,7 @@ class BarChart(ChartBase):
         w, h = self.width(), self.height()
         if not self.data:
             p.setPen(QColor("#9ca3af"))
-            p.drawText(self.rect(), Qt.AlignCenter, "No data")
+            p.drawText(self.rect(), Qt.AlignCenter, "Sem dados")
             return
 
         margin_left, margin_right, margin_top, margin_bottom = 56, 16, 24, 34
@@ -91,7 +91,7 @@ class LineChart(ChartBase):
         w, h = self.width(), self.height()
         if not self.data:
             p.setPen(QColor("#9ca3af"))
-            p.drawText(self.rect(), Qt.AlignCenter, "No data")
+            p.drawText(self.rect(), Qt.AlignCenter, "Sem dados")
             return
 
         margin_left, margin_right, margin_top, margin_bottom = 56, 16, 24, 34
@@ -113,16 +113,16 @@ class LineChart(ChartBase):
 
         points = [QPointF(x, y) for x, y in zip(xs, ys)]
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor("#4f46e5"))
+        p.setBrush(QColor("#ea580c"))
         for x, y, d in zip(xs, ys, self.data):
-            color = QColor(d.get("color", "#4f46e5"))
+            color = QColor(d.get("color", "#ea580c"))
             p.setBrush(color)
             p.drawEllipse(QRectF(x - 4, y - 4, 8, 8))
 
         path = QPainterPath(points[0])
         for x, y in zip(xs[1:], ys[1:]):
             path.lineTo(x, y)
-        p.setPen(QColor("#4f46e5"))
+        p.setPen(QColor("#ea580c"))
         p.setBrush(Qt.NoBrush)
         p.drawPath(path)
 
@@ -155,7 +155,7 @@ class PieChart(ChartBase):
         total = sum(d["value"] for d in self.data) or 1
         if not self.data:
             p.setPen(QColor("#9ca3af"))
-            p.drawText(self.rect(), Qt.AlignCenter, "No data")
+            p.drawText(self.rect(), Qt.AlignCenter, "Sem dados")
             return
 
         legend_w = max(int(w * 0.4), 130)
@@ -216,7 +216,7 @@ class HBarChart(ChartBase):
         w, h = self.width(), self.height()
         if not self.data:
             p.setPen(QColor("#9ca3af"))
-            p.drawText(self.rect(), Qt.AlignCenter, "No data")
+            p.drawText(self.rect(), Qt.AlignCenter, "Sem dados")
             return
 
         margin_left, margin_right, margin_top, margin_bottom = 140, 64, 12, 12

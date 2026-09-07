@@ -9,16 +9,16 @@ class AuthService:
 
     def login(self, username: str, password: str) -> tuple[bool, str, dict | None]:
         if not username.strip() or not password:
-            return False, "Enter username and password.", None
+            return False, "Informe usuário e senha.", None
         user = self._db.fetchone("SELECT * FROM users WHERE username=?", (username.strip(),))
         if not user:
-            return False, "Invalid username or password.", None
+            return False, "Usuário ou senha inválidos.", None
         if not user["is_active"]:
-            return False, "Account is disabled. Contact admin.", None
+            return False, "Conta desativada. Contate o administrador.", None
         if not verify_password(password, user["salt"], user["password_hash"]):
-            return False, "Invalid username or password.", None
+            return False, "Usuário ou senha inválidos.", None
         self.current_user = dict(user)
-        return True, "Success", dict(user)
+        return True, "Sucesso", dict(user)
 
     def logout(self):
         self.current_user = None
@@ -28,7 +28,7 @@ class AuthService:
 
     def add_user(self, username, password, full_name, role):
         if self._db.fetchone("SELECT id FROM users WHERE username=?", (username,)):
-            raise ValueError("Username already exists.")
+            raise ValueError("Este usuário já existe.")
         h, salt = hash_password(password)
         self._db.execute(
             "INSERT INTO users (username, password_hash, salt, full_name, role) VALUES (?,?,?,?,?)",

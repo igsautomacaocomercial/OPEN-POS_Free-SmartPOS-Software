@@ -246,6 +246,59 @@ def _expand(p, s):
     p.drawLine(4 * d, 20 * d, 4 * d, 16 * d)
 
 
+def _grid(p, s):
+    d = s / 12.0
+    for x, y in ((2, 2), (8, 2), (2, 8), (8, 8)):
+        p.drawRoundedRect(QRectF(x * d, y * d, 2.6 * d, 2.6 * d), 0.6 * d, 0.6 * d)
+
+
+def _map(p, s):
+    d = s / 24.0
+    p.drawRoundedRect(QRectF(3 * d, 4 * d, 18 * d, 16 * d), 2 * d, 2 * d)
+    p.drawLine(9 * d, 6 * d, 9 * d, 12 * d)
+    p.drawLine(15 * d, 8 * d, 15 * d, 18 * d)
+    p.drawLine(5 * d, 10 * d, 9 * d, 10 * d)
+    p.drawLine(11 * d, 12 * d, 15 * d, 12 * d)
+
+
+def _bike(p, s):
+    d = s / 24.0
+    p.drawEllipse(QRectF(5 * d, 15 * d, 6 * d, 6 * d))
+    p.drawEllipse(QRectF(13 * d, 15 * d, 6 * d, 6 * d))
+    p.drawLine(8 * d, 15 * d, 11 * d, 6 * d)
+    p.drawLine(11 * d, 6 * d, 16 * d, 15 * d)
+    p.drawLine(11 * d, 9 * d, 8 * d, 12 * d)
+    p.drawLine(16 * d, 15 * d, 8 * d, 15 * d)
+    p.drawLine(8 * d, 9 * d, 8 * d, 15 * d)
+
+
+def _users(p, s):
+    d = s / 24.0
+    p.drawEllipse(QRectF(4 * d, 3 * d, 5 * d, 5 * d))
+    p.drawArc(QRectF(2 * d, 9 * d, 9 * d, 6 * d), 180 * 16, 180 * 16)
+    p.drawEllipse(QRectF(14 * d, 5 * d, 6 * d, 6 * d))
+    p.drawArc(QRectF(12 * d, 12 * d, 10 * d, 7 * d), 180 * 16, 180 * 16)
+
+
+def _card(p, s):
+    d = s / 24.0
+    p.drawRoundedRect(QRectF(3 * d, 6 * d, 18 * d, 12 * d), 1.5 * d, 1.5 * d)
+    p.drawLine(3 * d, 10 * d, 21 * d, 10 * d)
+    p.drawRoundedRect(QRectF(6 * d, 12 * d, 4 * d, 3 * d), 0.8 * d, 0.8 * d)
+
+
+def _basket(p, s):
+    d = s / 24.0
+    p.drawArc(QRectF(7 * d, 2 * d, 10 * d, 8 * d), 180 * 16, 180 * 16)
+    p.drawLine(8 * d, 5 * d, 6 * d, 11 * d)
+    p.drawLine(6 * d, 11 * d, 6 * d, 20 * d)
+    p.drawLine(18 * d, 11 * d, 16 * d, 5 * d)
+    p.drawLine(18 * d, 11 * d, 18 * d, 20 * d)
+    p.drawLine(6 * d, 20 * d, 18 * d, 20 * d)
+    p.drawLine(9 * d, 11 * d, 9 * d, 20 * d)
+    p.drawLine(12 * d, 11 * d, 12 * d, 20 * d)
+    p.drawLine(15 * d, 11 * d, 15 * d, 20 * d)
+
 _DRAWERS = {
     "dashboard": _dashboard,
     "bag": _bag,
@@ -275,6 +328,12 @@ _DRAWERS = {
     "download": _download,
     "panel": _panel,
     "expand": _expand,
+    "grid": _grid,
+    "map": _map,
+    "bike": _bike,
+    "users": _users,
+    "card": _card,
+    "basket": _basket,
 }
 
 _cache = {}

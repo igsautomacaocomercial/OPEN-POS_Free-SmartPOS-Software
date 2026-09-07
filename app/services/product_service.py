@@ -19,7 +19,7 @@ class ProductService:
             "SELECT COUNT(*) c FROM products WHERE category_id=?", (cat_id,)
         )
         if products and products["c"] > 0:
-            raise ValueError("Category has products. Move or delete them first.")
+            raise ValueError("A categoria possui produtos. Mova ou exclua-os primeiro.")
         self._db.execute("DELETE FROM categories WHERE id=?", (cat_id,))
 
     def list_products(self, include_inactive=True):

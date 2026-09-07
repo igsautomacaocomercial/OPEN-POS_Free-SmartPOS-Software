@@ -48,7 +48,7 @@ class ExpenseService:
 
     def by_category_between(self, start, end):
         return self._db.fetchall(
-            "SELECT COALESCE(e.category_name,'Other') name, SUM(e.amount) total FROM expenses e "
+            "SELECT COALESCE(e.category_name,'Outros') name, SUM(e.amount) total FROM expenses e "
             "WHERE e.expense_date BETWEEN ? AND ? GROUP BY e.category_name ORDER BY total DESC",
             (start, end),
         )
