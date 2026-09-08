@@ -11,16 +11,18 @@ class OrderService:
     def create_order(self, order_type="dine-in", cashier_id=None, waiter_id=None,
                      rider_id=None, table_id=None, customer_name="", customer_phone="",
                      customer_address="", service_charge=0.0, instructions="",
-                     customer_id=None, neighborhood_id=None):
+                     customer_id=None, neighborhood_id=None, payment_method="Dinheiro",
+                     change_needed=0, change_amount=0.0, payment_details=""):
         number = settings_service.next_order_number()
         order_id = self._db.execute(
             "INSERT INTO orders (order_number, order_type, table_id, waiter_id, rider_id, "
             "cashier_id, instructions, customer_name, customer_phone, customer_address, "
-            "service_charge, customer_id, neighborhood_id) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "service_charge, customer_id, neighborhood_id, payment_method, change_needed, change_amount, payment_details) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (number, order_type, table_id, waiter_id, rider_id, cashier_id, instructions,
-             customer_name, customer_phone, customer_address, float(service_charge or 0),
-             customer_id, neighborhood_id),
+              customer_name, customer_phone, customer_address, float(service_charge or 0),
+              customer_id, neighborhood_id, payment_method or "Dinheiro",
+              int(change_needed or 0), float(change_amount or 0), payment_details or ""),
         )
         return self.get(order_id)
 
@@ -38,6 +40,22 @@ class OrderService:
     def get_items(self, order_id):
         return self._db.fetchall(
             "SELECT * FROM order_items WHERE order_id=? ORDER BY id", (order_id,)
+        )
+
+    def get_pending_kot_items(self, order_id):
+        order = self.get(order_id)
+        if not order:
+            return []
+        last_id = int(order["last_kot_item_id"] or 0)
+        return self._db.fetchall(
+            "SELECT * FROM order_items WHERE order_id=? AND id>? ORDER BY id",
+            (order_id, last_id),
+        )
+
+    def mark_kot_printed(self, order_id, last_item_id):
+        self._db.execute(
+            "UPDATE orders SET last_kot_item_id=? WHERE id=?",
+            (int(last_item_id or 0), order_id),
         )
 
     def get_open_order_for_table(self, table_id):
@@ -97,6 +115,32 @@ class OrderService:
         self._db.execute(
             "UPDATE orders SET service_charge=? WHERE id=?", (float(amount or 0), order_id))
         self._recalc(order_id)
+
+    def set_payment_method(self, order_id, payment_method):
+        self._db.execute(
+            "UPDATE orders SET payment_method=? WHERE id=?",
+            (payment_method or "Dinheiro", order_id),
+        )
+
+    def set_payment_details(self, order_id, payment_method=None, change_needed=None, change_amount=None, payment_details=None):
+        updates = []
+        params = []
+        if payment_method is not None:
+            updates.append("payment_method=?")
+            params.append(payment_method or "Dinheiro")
+        if change_needed is not None:
+            updates.append("change_needed=?")
+            params.append(1 if change_needed else 0)
+        if change_amount is not None:
+            updates.append("change_amount=?")
+            params.append(float(change_amount or 0))
+        if payment_details is not None:
+            updates.append("payment_details=?")
+            params.append(payment_details or "")
+        if not updates:
+            return
+        params.append(order_id)
+        self._db.execute(f"UPDATE orders SET {', '.join(updates)} WHERE id=?", params)
 
     def set_customer_info(self, order_id, customer_id=None, name=None, phone=None, address=None):
         self._db.execute(
@@ -181,10 +225,15 @@ class OrderService:
                     (order_id, order["table_id"]),
                 )
 
-    def finalize(self, order_id, payment_method="Dinheiro"):
+    def finalize(self, order_id, payment_method="Dinheiro", payment_details=None):
+        updates = ["status='paid'", "payment_method=?", "closed_at=?"]
+        params = [payment_method, now_str()]
+        if payment_details is not None:
+            updates.append("payment_details=?")
+            params.append(payment_details or "")
         self._db.execute(
-            "UPDATE orders SET status='paid', payment_method=?, closed_at=? WHERE id=?",
-            (payment_method, now_str(), order_id),
+            f"UPDATE orders SET {', '.join(updates)} WHERE id=?",
+            (*params, order_id),
         )
         order = self.get(order_id)
         if order and order["table_id"]:

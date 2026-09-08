@@ -283,3 +283,112 @@ TRABALHO CONCLUIDO (2026-09-07 - CLIENTES/FORNECEDORES)
 DECISAO DO USUARIO: padrao de grade paginada + formulario showroom para
 CLIENTES E FORNECEDORES; "Inativar" esconde o registro do seletor de venda
 e das listagens padrao (aparece so com "Mostrar inativos").
+
+--------------------------------------------------------
+TRABALHO CONCLUIDO (2026-09-07 - QUICK SALE / DELIVERY)
+--------------------------------------------------------
+1) app/ui/pos_view.py
+   - Tela Quick Sale traduzida para pt-BR: "Venda Rápida", "Para Viagem",
+     "Entrega", "Novo Pedido", "Pendentes", "Concluídos".
+   - Cabeçalho do pedido e detalhes traduzidos: Pedido, Data, Garçom,
+     Motoqueiro, Cliente, Telefone, Endereço, Taxa de entrega.
+   - Botões traduzidos: "Imprimir Conta", "Cópia do Motoqueiro",
+     "Fechar", "Imprimir KOT e Enviar para Pendentes", "Limpar Pedido".
+   - Delivery reorganizado: Telefone primeiro com destaque visual azul,
+     depois Nome, Endereço, Bairro e Cadastrar Cliente.
+   - Busca de cliente por telefone normalizado com only_digits e auto-preenchimento.
+   - Carregamento do bairro do cliente no combo de entrega.
+   - Regra de taxa de entrega preservada, aplicada ao bairro selecionado.
+   - Métodos QuickSalePage restaurados/validados: _neighborhood_changed,
+     _register_customer, _lookup_customer, _send_to_pending, _clear.
+2) Validacao
+   - py_compile app/ui/pos_view.py -> OK
+   - app subiu novamente sem erro de import/sintaxe apos correcoes.
+
+3) Repositorio extra para analise
+   - Criado espelho do projeto em `C:\Users\USER\ai-workspace\OPEN-POS_analysis`
+     para analise separada no Git.
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-07 - FECHAMENTO DE MESA)
+--------------------------------------------------------
+- FinalizeSaleDialog ajustado para dar mais destaque ao campo de forma de pagamento.
+- Campo "Forma" ganhou fonte 14px, altura maior e comportamento expansivel.
+- Linha de pagamento ficou mais alta para nao cortar o texto nem o nome "Dinheiro".
+- Proxima etapa em aberto: ajustar o livro-caixa resumido e detalhado nos relatorios.
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-07 - RELATORIOS / LIVRO CAIXA)
+--------------------------------------------------------
+- Livro caixa resumido ganhou resumo mais completo: sessoes abertas/fechadas, saldo inicial, entradas, saidas, liquido, esperado, fechado e diferenca.
+- Tabelas de sessoes e movimentos agora usam coluna de sessao (#id) e larguras melhores.
+- Impressao resumida e detalhada do caixa ficou mais legivel e com totalizador final.
+- Exportacao da aba Caixa foi alinhada com as novas colunas.
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-07 - KOT / IMPRESSAO)
+--------------------------------------------------------
+- KOT e Salvamento na mesa passaram a imprimir apenas os itens novos desde o ultimo KOT.
+- Adicionado marcador last_kot_item_id no pedido para controlar o ultimo lote impresso.
+- Layout do cupom de itens ficou mais espaçado: PRODUTO / QTD / VLR.
+- Linha de branding do cupom trocada para: "Sistema Desenvolvido por IGS Automacao Comercial".
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-07 - DELIVERY / CUPOM FINAL)
+--------------------------------------------------------
+- Fluxo de Delivery/Quick Sale passou a imprimir apenas os itens novos no envio para pendentes.
+- Reimpressao e envio de KOT usam last_kot_item_id para evitar repetir itens ja impressos.
+- Titulo "CONTA FINAL" reduzido para ficar menos agressivo no cupom.
+- Branding do rodape do cupom ficou alinhado a esquerda para aparecer mais discreto.
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-07 - PREVIA KOT)
+--------------------------------------------------------
+- A pre-visualizacao do KOT foi alinhada ao cupom real: titulo, ordem, campos do pedido, separador, itens, observacoes e rodape.
+- Reimpressao da previa agora usa o mesmo fluxo da impressao real do KOT.
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-07 - PREVIA CONTA FINAL)
+--------------------------------------------------------
+- A conta final da mesa agora tem pre-visualizacao 1:1 antes da impressao.
+- O fluxo ficou: gerar pagamento -> mostrar previa -> confirmar -> finalizar venda -> imprimir conta final.
+- Corrigido o uso de sqlite3.Row no preview da conta final com conversao para dict.
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-07 - IMPRESSAO / TITULOS)
+--------------------------------------------------------
+- Titulo "CONTA" no pedido de conta foi reduzido para sair menos destacado.
+- Branding do rodape foi encurtado para "IGS Automacao Comercial" para nao ficar grandao.
+- Fluxos de KOT/Pedir Conta/Salvar na mesa foram endurecidos com _as_dict para evitar sqlite3.Row sem .get.
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-07 - SMOKE DE IMPRESSAO)
+--------------------------------------------------------
+- Smoke test executado no venv com sucesso para KOT, pedido de conta e conta final.
+- Corrigido get_pending_kot_items() para nao usar .get() em sqlite3.Row.
+- Confirmado: print_request_bill / print_final_bill / print_kot geram bytes sem erro com monkeypatch de send_raw.
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-07 - KOT PROFISSIONAL)
+--------------------------------------------------------
+- KOT foi refatorado para cozinha/bar: sem preco, com PEDIDO/MESA/TIPO/DATA/HORA/GARCOM, separadores fortes, itens com quantidade antes do produto e observacoes destacadas.
+- A mesma linguagem visual foi espelhada na pre-visualizacao do KOT.
+- Smoke test no venv passou com 1 item, varios itens e impressao multipla gerando bytes sem erro.
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-07 - CONTA PROFISSIONAL)
+--------------------------------------------------------
+- CONTA / CONTA FINAL foram refatoradas com template textual proprio para 80mm.
+- Layout agora tem cabecalho limpo, pedido/mesa/tipo/data/hora/caixa, itens alinhados sem preço grudado, totais destacados e rodape discreto.
+- A pre-visualizacao da conta final foi alinhada ao mesmo gerador de texto do cupom impresso.
+- Smoke test no venv passou gerando bytes para CONTA e CONTA FINAL sem erro.

@@ -40,11 +40,17 @@ class FinanceService:
 
     def record_sale(self, amount, note):
         session = self.current_session()
+        if not session:
+            self.open_session(0)
+            session = self.current_session()
         if session:
             self.add_move(session["id"], "entrada", amount, note or "Venda")
 
     def record_expense(self, amount, note):
         session = self.current_session()
+        if not session:
+            self.open_session(0)
+            session = self.current_session()
         if session:
             self.add_move(session["id"], "saida", amount, note or "Despesa")
 

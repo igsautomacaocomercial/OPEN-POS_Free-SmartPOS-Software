@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QTextDocument
-from PySide6.QtPrintSupport import QPrinter
+from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QComboBox, QDateEdit, QFileDialog, QFrame, QHBoxLayout, QLabel, QMessageBox,
     QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
@@ -147,21 +147,22 @@ class ReportsView(QWidget):
         card = QFrame()
         card.setProperty("card", True)
         row = QHBoxLayout(card)
-        row.setContentsMargins(16, 12, 16, 12)
-        row.setSpacing(10)
+        row.setContentsMargins(20, 14, 20, 14)
+        row.setSpacing(14)
 
         self.preset = QComboBox()
         self.preset.addItems(PRESETS)
+        self.preset.setFixedWidth(140)
         self.preset.currentIndexChanged.connect(self._preset_changed)
         row.addWidget(self.preset)
 
         self.date_from = QDateEdit()
         self.date_from.setCalendarPopup(True)
-        self.date_from.setFixedWidth(120)
+        self.date_from.setFixedWidth(132)
         self.date_from.setDate(datetime.date.today())
         self.date_to = QDateEdit()
         self.date_to.setCalendarPopup(True)
-        self.date_to.setFixedWidth(120)
+        self.date_to.setFixedWidth(132)
         self.date_to.setDate(datetime.date.today())
         row.addWidget(self.date_from)
         arrow = QLabel("→")
@@ -179,36 +180,43 @@ class ReportsView(QWidget):
         self.filter_type.addItem("Todos os Tipos", None)
         for k in ("dine-in", "takeaway", "delivery"):
             self.filter_type.addItem(TYPE_LABELS[k], k)
+        self.filter_type.setFixedWidth(160)
         row.addWidget(self.filter_type)
 
         self.filter_pay = QComboBox()
         self.filter_pay.addItem("Todos os Pagamentos", None)
+        self.filter_pay.setFixedWidth(180)
         row.addWidget(self.filter_pay)
 
         self.filter_waiter = QComboBox()
         self.filter_waiter.addItem("Todos os Garçons", None)
+        self.filter_waiter.setFixedWidth(180)
         row.addWidget(self.filter_waiter)
 
         run = QPushButton("   Executar")
         run.setProperty("primary", True)
         run.setIcon(make_icon("refresh", "#ffffff", 24))
         run.setIconSize(QSize(18, 18))
+        run.setMinimumWidth(120)
         run.clicked.connect(self.refresh)
         row.addWidget(run)
 
         export = QPushButton("Exportar CSV")
         export.setIcon(make_icon("download", "#4b5563", 24))
         export.setIconSize(QSize(16, 16))
+        export.setMinimumWidth(132)
         export.clicked.connect(self._export_csv)
         row.addWidget(export)
         excel = QPushButton("Exportar Excel")
         excel.setIcon(make_icon("download", "#4b5563", 24))
         excel.setIconSize(QSize(16, 16))
+        excel.setMinimumWidth(138)
         excel.clicked.connect(self._export_excel)
         row.addWidget(excel)
         pdf = QPushButton("Exportar PDF")
         pdf.setIcon(make_icon("download", "#4b5563", 24))
         pdf.setIconSize(QSize(16, 16))
+        pdf.setMinimumWidth(132)
         pdf.clicked.connect(self._export_pdf)
         row.addWidget(pdf)
         row.addStretch()
@@ -396,11 +404,26 @@ class ReportsView(QWidget):
         self.cash_report_summary = QLabel("Selecione o período e clique em Executar.")
         self.cash_report_summary.setObjectName("CardTitle")
         self.cash_report_summary.setTextFormat(Qt.RichText)
+        self.cash_report_summary.setWordWrap(True)
+        self.cash_report_summary.setStyleSheet("line-height: 1.4; padding: 2px 0;")
         top.addWidget(self.cash_report_summary, 1)
+        self.cash_print_summary = QPushButton("   Imprimir Resumido")
+        self.cash_print_summary.setIcon(make_icon("print", "#4b5563", 24))
+        self.cash_print_summary.setIconSize(QSize(18, 18))
+        self.cash_print_summary.clicked.connect(lambda: self._print_cash_report(False))
+        self.cash_print_detail = QPushButton("   Imprimir Detalhado")
+        self.cash_print_detail.setProperty("primary", True)
+        self.cash_print_detail.setIcon(make_icon("print", "#ffffff", 24))
+        self.cash_print_detail.setIconSize(QSize(18, 18))
+        self.cash_print_detail.clicked.connect(lambda: self._print_cash_report(True))
+        top.addWidget(self.cash_print_summary)
+        top.addWidget(self.cash_print_detail)
         lay.addLayout(top)
         self.cash_sessions_table = self._make_table(
-            ["Abertura", "Fechamento", "Abertura", "Entradas", "Saídas", "Esperado", "Fechado", "Status"])
-        self.cash_moves_table = self._make_table(["Data/Hora", "Tipo", "Motivo", "Valor"])
+            ["Sessão", "Abertura", "Fechamento", "Entradas", "Saídas", "Esperado", "Fechado", "Diferença", "Status"],
+            stretch_last=False,
+        )
+        self.cash_moves_table = self._make_table(["Sessão", "Data/Hora", "Tipo", "Motivo", "Valor"], stretch_last=False)
         lay.addWidget(self._table_card("Sessões de Caixa", self.cash_sessions_table), 1)
         lay.addWidget(self._table_card("Movimentos de Caixa", self.cash_moves_table), 1)
         return w
@@ -581,7 +604,7 @@ class ReportsView(QWidget):
             self.waiter_table.setItem(i, 4, QTableWidgetItem(fmt_money(r["avg_ticket"], currency)))
         self.waiter_table.resizeColumnsToContents()
 
-        riders = report_service.staff_performance(start, end, "Entregador")
+        riders = report_service.staff_performance(start, end, "Entregador", **flt)
         self.rider_bar.set_data([
             {"label": r["name"][:20], "value": r["orders"],
              "color": PALETTE[i % len(PALETTE)]}
@@ -631,35 +654,176 @@ class ReportsView(QWidget):
         moves = finance_service.movements_between(start, end)
         total_in = sum(float(m["amount"]) for m in moves if m["kind"] == "entrada")
         total_out = sum(float(m["amount"]) for m in moves if m["kind"] == "saida")
-        summary = (f"<b>Sessões:</b> {len(sessions)} &nbsp;·&nbsp; "
-                   f"<b>Entradas:</b> {fmt_money(total_in, currency)} &nbsp;·&nbsp; "
-                   f"<b>Saídas:</b> {fmt_money(total_out, currency)} &nbsp;·&nbsp; "
-                   f"<b>Líquido:</b> {fmt_money(total_in - total_out, currency)}")
+        total_opening = 0.0
+        total_expected = 0.0
+        total_closed = 0.0
+        for s in sessions:
+            s = dict(s)
+            ssum = finance_service.summary(s["id"])
+            expected = float(s["opening_amount"] or 0) + ssum["liquido"]
+            total_opening += float(s["opening_amount"] or 0)
+            total_expected += expected
+            total_closed += float(s["closing_amount"] or 0)
+        total_diff = total_closed - total_expected
+        summary = (
+            f"<b>Sessões:</b> {len(sessions)} &nbsp;·&nbsp; "
+            f"<b>Abertas:</b> {sum(1 for s in sessions if s['status'] != 'closed')} &nbsp;·&nbsp; "
+            f"<b>Fechadas:</b> {sum(1 for s in sessions if s['status'] == 'closed')}<br>"
+            f"<b>Saldo inicial:</b> {fmt_money(total_opening, currency)} &nbsp;·&nbsp; "
+            f"<b>Entradas:</b> {fmt_money(total_in, currency)} &nbsp;·&nbsp; "
+            f"<b>Saídas:</b> {fmt_money(total_out, currency)} &nbsp;·&nbsp; "
+            f"<b>Líquido:</b> {fmt_money(total_in - total_out, currency)}<br>"
+            f"<b>Esperado:</b> {fmt_money(total_expected, currency)} &nbsp;·&nbsp; "
+            f"<b>Fechado:</b> {fmt_money(total_closed, currency)} &nbsp;·&nbsp; "
+            f"<b>Diferença:</b> {fmt_money(total_diff, currency)}"
+        )
         self.cash_report_summary.setText(summary)
 
         self.cash_sessions_table.setRowCount(len(sessions))
         for i, s in enumerate(sessions):
+            s = dict(s)
             ssum = finance_service.summary(s["id"])
             expected = float(s["opening_amount"] or 0) + ssum["liquido"]
-            self.cash_sessions_table.setItem(i, 0, QTableWidgetItem(s["opened_at"] or "—"))
-            self.cash_sessions_table.setItem(i, 1, QTableWidgetItem(s.get("closed_at") or "—"))
-            self.cash_sessions_table.setItem(i, 2, QTableWidgetItem(fmt_money(s["opening_amount"], currency)))
+            closed_amount = float(s["closing_amount"] or 0)
+            diff = closed_amount - expected
+            self.cash_sessions_table.setItem(i, 0, QTableWidgetItem(f"#{s['id']}"))
+            self.cash_sessions_table.setItem(i, 1, QTableWidgetItem(s["opened_at"] or "—"))
+            self.cash_sessions_table.setItem(i, 2, QTableWidgetItem(s["closed_at"] or "—"))
             self.cash_sessions_table.setItem(i, 3, QTableWidgetItem(fmt_money(ssum["entrada"], currency)))
             self.cash_sessions_table.setItem(i, 4, QTableWidgetItem(fmt_money(ssum["saida"], currency)))
             self.cash_sessions_table.setItem(i, 5, QTableWidgetItem(fmt_money(expected, currency)))
-            self.cash_sessions_table.setItem(i, 6, QTableWidgetItem(fmt_money(s.get("closing_amount") or 0, currency)))
-            self.cash_sessions_table.setItem(i, 7, QTableWidgetItem(
+            self.cash_sessions_table.setItem(i, 6, QTableWidgetItem(fmt_money(closed_amount, currency)))
+            self.cash_sessions_table.setItem(i, 7, QTableWidgetItem(fmt_money(diff, currency)))
+            self.cash_sessions_table.setItem(i, 8, QTableWidgetItem(
                 "Fechado" if s["status"] == "closed" else "Aberto"))
         self.cash_sessions_table.resizeColumnsToContents()
+        self.cash_sessions_table.setColumnWidth(0, 70)
+        self.cash_sessions_table.setColumnWidth(1, 150)
+        self.cash_sessions_table.setColumnWidth(2, 150)
+        self.cash_sessions_table.setColumnWidth(3, 110)
+        self.cash_sessions_table.setColumnWidth(4, 110)
+        self.cash_sessions_table.setColumnWidth(5, 110)
+        self.cash_sessions_table.setColumnWidth(6, 110)
+        self.cash_sessions_table.setColumnWidth(7, 110)
+        self.cash_sessions_table.setColumnWidth(8, 90)
 
         self.cash_moves_table.setRowCount(len(moves))
         for i, m in enumerate(moves):
-            self.cash_moves_table.setItem(i, 0, QTableWidgetItem(m["created_at"]))
-            self.cash_moves_table.setItem(i, 1, QTableWidgetItem(
+            self.cash_moves_table.setItem(i, 0, QTableWidgetItem(f"#{m['session_id']}"))
+            self.cash_moves_table.setItem(i, 1, QTableWidgetItem(m["created_at"]))
+            self.cash_moves_table.setItem(i, 2, QTableWidgetItem(
                 "Entrada" if m["kind"] == "entrada" else "Saída"))
-            self.cash_moves_table.setItem(i, 2, QTableWidgetItem(m["reason"] or ""))
-            self.cash_moves_table.setItem(i, 3, QTableWidgetItem(fmt_money(m["amount"], currency)))
+            self.cash_moves_table.setItem(i, 3, QTableWidgetItem(m["reason"] or ""))
+            self.cash_moves_table.setItem(i, 4, QTableWidgetItem(fmt_money(m["amount"], currency)))
         self.cash_moves_table.resizeColumnsToContents()
+        self.cash_moves_table.setColumnWidth(0, 70)
+        self.cash_moves_table.setColumnWidth(1, 150)
+        self.cash_moves_table.setColumnWidth(2, 90)
+        self.cash_moves_table.setColumnWidth(3, 360)
+        self.cash_moves_table.setColumnWidth(4, 110)
+
+    def _cash_report_html(self, start, end, currency, detailed=False):
+        sessions = finance_service.sessions_between(start, end)
+        moves = finance_service.movements_between(start, end)
+        total_in = sum(float(m["amount"]) for m in moves if m["kind"] == "entrada")
+        total_out = sum(float(m["amount"]) for m in moves if m["kind"] == "saida")
+        total_opening = 0.0
+        total_expected = 0.0
+        total_closed = 0.0
+        for s in sessions:
+            s = dict(s)
+            ssum = finance_service.summary(s["id"])
+            expected = float(s["opening_amount"] or 0) + ssum["liquido"]
+            total_opening += float(s["opening_amount"] or 0)
+            total_expected += expected
+            total_closed += float(s["closing_amount"] or 0)
+        total_diff = total_closed - total_expected
+        biz = settings_service.get("business_name", "Open POS")
+
+        def row(cols):
+            return "<tr>" + "".join(
+                f"<td style='padding:5px 6px; border-bottom:1px solid #e5e7eb;'>{html.escape(str(c))}</td>"
+                for c in cols
+            ) + "</tr>"
+
+        html_parts = [
+            "<div style='font-family: Arial, sans-serif;'>",
+            f"<h1 style='margin:0; color:#ea580c;'>Livro Caixa · {html.escape(biz)}</h1>",
+            f"<h2 style='margin:4px 0 12px 0; color:#6b7280; font-weight:400;'>"
+            f"Período: {start} a {end}</h2>",
+            f"<p style='font-size:13px; line-height:1.55;'><b>Sessões:</b> {len(sessions)} &nbsp;·&nbsp; "
+            f"<b>Abertas:</b> {sum(1 for s in sessions if s['status'] != 'closed')} &nbsp;·&nbsp; "
+            f"<b>Fechadas:</b> {sum(1 for s in sessions if s['status'] == 'closed')}<br>"
+            f"<b>Saldo inicial:</b> {fmt_money(total_opening, currency)} &nbsp;·&nbsp; "
+            f"<b>Entradas:</b> {fmt_money(total_in, currency)} &nbsp;·&nbsp; "
+            f"<b>Saídas:</b> {fmt_money(total_out, currency)} &nbsp;·&nbsp; "
+            f"<b>Líquido:</b> {fmt_money(total_in - total_out, currency)}<br>"
+            f"<b>Esperado:</b> {fmt_money(total_expected, currency)} &nbsp;·&nbsp; "
+            f"<b>Fechado:</b> {fmt_money(total_closed, currency)} &nbsp;·&nbsp; "
+            f"<b>Diferença:</b> {fmt_money(total_diff, currency)}</p>",
+        ]
+
+        html_parts.append("<h3>Resumo das Sessões</h3>")
+        html_parts.append("<table style='border-collapse:collapse; width:100%; font-size:12px;'>")
+        html_parts.append(
+            "<tr><th align='left'>Sessão</th><th align='left'>Abertura</th><th align='left'>Fechamento</th>"
+            "<th align='left'>Entradas</th><th align='left'>Saídas</th><th align='left'>Esperado</th>"
+            "<th align='left'>Fechado</th><th align='left'>Diferença</th><th align='left'>Status</th></tr>"
+        )
+        for s in sessions:
+            s = dict(s)
+            ssum = finance_service.summary(s["id"])
+            expected = float(s["opening_amount"] or 0) + ssum["liquido"]
+            html_parts.append(row([
+                f"#{s['id']}",
+                s["opened_at"] or "—",
+                s["closed_at"] or "—",
+                fmt_money(ssum["entrada"], currency),
+                fmt_money(ssum["saida"], currency),
+                fmt_money(expected, currency),
+                fmt_money(s["closing_amount"] or 0, currency),
+                fmt_money(float(s["closing_amount"] or 0) - expected, currency),
+                "Fechado" if s["status"] == "closed" else "Aberto",
+            ]))
+        if sessions:
+            html_parts.append(row([
+                "Total", "", "", fmt_money(total_in, currency), fmt_money(total_out, currency),
+                fmt_money(total_expected, currency), fmt_money(total_closed, currency),
+                fmt_money(total_diff, currency), "",
+            ]))
+        html_parts.append("</table>")
+
+        if detailed:
+            html_parts.append("<h3 style='margin-top:16px;'>Movimentos</h3>")
+            html_parts.append("<table style='border-collapse:collapse; width:100%; font-size:12px;'>")
+            html_parts.append("<tr><th align='left'>Sessão</th><th align='left'>Data/Hora</th><th align='left'>Tipo</th><th align='left'>Motivo</th><th align='left'>Valor</th></tr>")
+            for m in moves:
+                html_parts.append(row([
+                    f"#{m['session_id']}",
+                    m["created_at"],
+                    "Entrada" if m["kind"] == "entrada" else "Saída",
+                    m["reason"] or "",
+                    fmt_money(m["amount"], currency),
+                ]))
+            html_parts.append("</table>")
+
+        html_parts.append("</div>")
+        return "".join(html_parts)
+
+    def _print_cash_report(self, detailed=False):
+        start = self.date_from.date().toString("yyyy-MM-dd")
+        end = self.date_to.date().toString("yyyy-MM-dd")
+        currency = settings_service.get("currency", "R$")
+        doc = QTextDocument()
+        doc.setHtml(self._cash_report_html(start, end, currency, detailed=detailed))
+        printer = QPrinter(QPrinter.HighResolution)
+        dlg = QPrintDialog(printer, self)
+        if not dlg.exec():
+            return
+        try:
+            doc.print_(printer)
+        except Exception as e:
+            QMessageBox.critical(self, "Erro ao Imprimir", str(e))
 
     def _refresh_payables_report(self, start, end, currency):
         rows = finance_service.payables_between(start, end)
@@ -733,7 +897,7 @@ class ReportsView(QWidget):
             data = [[r["name"], r["qty"], r["revenue"]] for r in rows]
         elif tab == 3:
             waiters = report_service.staff_performance(start, end, "Garçom", **flt)
-            riders = report_service.staff_performance(start, end, "Entregador")
+            riders = report_service.staff_performance(start, end, "Entregador", **flt)
             headers = ["Nome", "Papel", "Pedidos", "Receita"]
             data = ([[r["name"], "Garçom", r["orders"], r["revenue"]] for r in waiters]
                     + [[r["name"], "Entregador", r["orders"], r["revenue"]] for r in riders])
@@ -749,16 +913,16 @@ class ReportsView(QWidget):
             elif tab == 6:
                 sessions = finance_service.sessions_between(start, end)
                 moves = finance_service.movements_between(start, end)
-                headers = ["Data", "Tipo", "Descrição", "Valor"]
+                headers = ["Sessão", "Data/Hora", "Tipo", "Descrição", "Valor"]
                 data = []
                 for m in moves:
-                    data.append([m["created_at"], "Entrada" if m["kind"] == "entrada" else "Saída",
+                    data.append([m["session_id"], m["created_at"], "Entrada" if m["kind"] == "entrada" else "Saída",
                                  m["reason"] or "", m["amount"]])
                 for s in sessions:
                     ssum = finance_service.summary(s["id"])
                     expected = float(s["opening_amount"] or 0) + ssum["liquido"]
-                    data.append([s["opened_at"], "Sessão",
-                                 f"Abertura R$ {s['opening_amount']} · Esperado R$ {expected:.2f}",
+                    data.append([f"#{s['id']}", s["opened_at"], "Sessão",
+                                 f"Abertura R$ {s['opening_amount']} · Esperado R$ {expected:.2f} · Fechado R$ {float(s['closing_amount'] or 0):.2f}",
                                  expected])
             elif tab == 7:
                 rows = finance_service.payables_between(start, end)

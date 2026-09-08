@@ -179,13 +179,17 @@ class ReportService:
 
     def staff_performance(self, start, end, role="Garçom", **filters):
         if role == "Entregador":
+            f2 = dict(filters)
+            f2.pop("waiter_id", None)
+            where, params = _filter_where(f2)
             return self._db.fetchall(
                 "SELECT COALESCE(w.name,'-') name, COUNT(DISTINCT o.id) orders, "
                 "COALESCE(SUM(o.total),0) revenue, COALESCE(AVG(o.total),0) avg_ticket "
                 "FROM orders o LEFT JOIN staff w ON w.id=o.rider_id "
                 "WHERE o.status IN ('paid','closed') AND date(o.created_at) BETWEEN ? AND ? "
+                + where +
                 "GROUP BY w.id ORDER BY revenue DESC",
-                (start, end),
+                [start, end] + params,
             )
         f2 = dict(filters)
         f2.pop("waiter_id", None)

@@ -123,6 +123,8 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_phone TEXT NOT NULL DEFAULT '',
     customer_address TEXT NOT NULL DEFAULT '',
     payment_method TEXT NOT NULL DEFAULT 'Dinheiro',
+    payment_details TEXT NOT NULL DEFAULT '',
+    last_kot_item_id INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     closed_at TEXT
 );
@@ -302,6 +304,10 @@ class Database:
             "customer_phone": "TEXT NOT NULL DEFAULT ''",
             "customer_address": "TEXT NOT NULL DEFAULT ''",
             "service_charge": "REAL NOT NULL DEFAULT 0",
+            "change_needed": "INTEGER NOT NULL DEFAULT 0",
+            "change_amount": "REAL NOT NULL DEFAULT 0",
+            "payment_details": "TEXT NOT NULL DEFAULT ''",
+            "last_kot_item_id": "INTEGER NOT NULL DEFAULT 0",
             "rider_id": "INTEGER",
             "customer_id": "INTEGER",
             "neighborhood_id": "INTEGER",
@@ -516,4 +522,3 @@ def rebind_services(database: Database):
             settings_service.store_logo_path()
         except Exception:
             pass
-

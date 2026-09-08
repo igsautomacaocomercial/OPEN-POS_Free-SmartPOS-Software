@@ -110,11 +110,11 @@ class EscposBuilder:
         dots = max(0, self.cols - len(label) - len(value))
         return self._add(label + (fill * dots) + value)
 
-    def items(self, rows, name_ratio: float = 0.56, qty_ratio: float = 0.16):
-        name_w = max(1, int(self.cols * name_ratio))
-        qty_w = max(1, int(self.cols * qty_ratio))
-        price_w = max(1, self.cols - name_w - qty_w)
-        self._add("ITEM".ljust(name_w) + "QTY".rjust(qty_w) + "PRICE".rjust(price_w), "l", True)
+    def items(self, rows, name_ratio: float = 0.54, qty_ratio: float = 0.12):
+        name_w = max(12, int(self.cols * name_ratio))
+        qty_w = max(4, int(self.cols * qty_ratio))
+        price_w = max(8, self.cols - name_w - qty_w - 2)
+        self._add("PRODUTO".ljust(name_w) + "QTD".rjust(qty_w + 1) + "VLR".rjust(price_w + 1), "l", True)
         self.rule("-")
         for it in rows:
             name = str(it.get("name", ""))
@@ -124,11 +124,13 @@ class EscposBuilder:
                 qty_s = str(float(qty)).rstrip("0").rstrip(".") if float(qty) % 1 else str(int(float(qty)))
             except (TypeError, ValueError):
                 qty_s = str(qty)
-            price_s = f"{float(price):g}" if price != "" and price is not None else "0"
+            price_s = str(price).strip() if price not in (None, "") else "0"
+            if price_s.replace("R$", "").strip() == price_s and isinstance(price, (int, float)):
+                price_s = f"{float(price):.2f}"
             lines = _fit(name, name_w)
             for i, ln in enumerate(lines):
                 if i == 0:
-                    self._add(ln.ljust(name_w) + qty_s.rjust(qty_w) + price_s.rjust(price_w))
+                    self._add(ln.ljust(name_w) + " " + qty_s.rjust(qty_w) + " " + price_s.rjust(price_w))
                 else:
                     self._add(ln.ljust(name_w))
         return self
