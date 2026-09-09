@@ -392,3 +392,23 @@ ATUALIZACAO (2026-09-07 - CONTA PROFISSIONAL)
 - Layout agora tem cabecalho limpo, pedido/mesa/tipo/data/hora/caixa, itens alinhados sem preço grudado, totais destacados e rodape discreto.
 - A pre-visualizacao da conta final foi alinhada ao mesmo gerador de texto do cupom impresso.
 - Smoke test no venv passou gerando bytes para CONTA e CONTA FINAL sem erro.
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-08 - KOT INCREMENTAL ROBUSTO)
+--------------------------------------------------------
+- KOT incremental deixou de depender somente de last_kot_item_id.
+- order_items ganhou kot_printed_qty e kot_printed_instructions para controlar quantidade e observacao ja enviadas para cozinha.
+- Se aumentar quantidade de item ja impresso, proximo KOT imprime apenas a diferenca.
+- Se alterar observacao de item ja impresso, item volta ao proximo KOT para avisar a cozinha.
+- Smoke test no venv confirmou: primeiro envio, aumento de quantidade e alteracao de observacao.
+
+
+--------------------------------------------------------
+ATUALIZACAO (2026-09-08 - KOT CANCELAMENTO/ALTERACAO)
+--------------------------------------------------------
+- KOT incremental agora diferencia ADICIONAR, CANCELAR e ALTERAR OBS.
+- Reducao de quantidade gera KOT de cancelamento da diferenca.
+- Remocao de item ja enviado preserva o item com qty=0 para gerar cancelamento no KOT, mas esconde o item da conta/carrinho.
+- Alteracao de observacao gera destaque no KOT para nao parecer novo pedido comum.
+- Smoke test no venv passou cobrindo adicionar, aumentar, alterar observacao, reduzir e remover.

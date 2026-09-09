@@ -39,24 +39,54 @@ class OrderService:
 
     def get_items(self, order_id):
         return self._db.fetchall(
-            "SELECT * FROM order_items WHERE order_id=? ORDER BY id", (order_id,)
+            "SELECT * FROM order_items WHERE order_id=? AND qty>0 ORDER BY id", (order_id,)
         )
 
     def get_pending_kot_items(self, order_id):
-        order = self.get(order_id)
-        if not order:
-            return []
-        last_id = int(order["last_kot_item_id"] or 0)
-        return self._db.fetchall(
-            "SELECT * FROM order_items WHERE order_id=? AND id>? ORDER BY id",
-            (order_id, last_id),
-        )
+        items = self._db.fetchall("SELECT * FROM order_items WHERE order_id=? ORDER BY id", (order_id,))
+        pending = []
+        for item in items:
+            row = dict(item)
+            qty = float(row["qty"] or 0)
+            printed_qty = float(row.get("kot_printed_qty") or 0)
+            current_note = row.get("instructions") or ""
+            printed_note = row.get("kot_printed_instructions") or ""
+            delta_qty = round(qty - printed_qty, 3)
+            note_changed = current_note != printed_note
+            if delta_qty > 0:
+                row["qty"] = delta_qty
+                row["kot_action"] = "ADICIONAR"
+                pending.append(row)
+            elif delta_qty < 0:
+                row["qty"] = abs(delta_qty)
+                row["kot_action"] = "CANCELAR"
+                pending.append(row)
+            elif note_changed and qty > 0:
+                row["qty"] = qty
+                row["kot_action"] = "ALTERAR OBS"
+                pending.append(row)
+        return pending
 
-    def mark_kot_printed(self, order_id, last_item_id):
-        self._db.execute(
-            "UPDATE orders SET last_kot_item_id=? WHERE id=?",
-            (int(last_item_id or 0), order_id),
-        )
+    def mark_kot_printed(self, order_id, items):
+        if not items:
+            return
+        last_item_id = 0
+        for item in items:
+            item = dict(item)
+            item_id = int(item["id"])
+            current = self._db.fetchone("SELECT qty, instructions FROM order_items WHERE id=? AND order_id=?", (item_id, order_id))
+            if not current:
+                continue
+            self._db.execute(
+                "UPDATE order_items SET kot_printed_qty=?, kot_printed_instructions=? WHERE id=? AND order_id=?",
+                (float(current["qty"] or 0), current["instructions"] or "", item_id, order_id),
+            )
+            last_item_id = max(last_item_id, item_id)
+        if last_item_id:
+            self._db.execute(
+                "UPDATE orders SET last_kot_item_id=MAX(COALESCE(last_kot_item_id,0), ?) WHERE id=?",
+                (last_item_id, order_id),
+            )
 
     def get_open_order_for_table(self, table_id):
         return self._db.fetchone(
@@ -93,8 +123,11 @@ class OrderService:
         )
 
     def remove_item(self, item_id):
-        row = self._db.fetchone("SELECT order_id FROM order_items WHERE id=?", (item_id,))
-        self._db.execute("DELETE FROM order_items WHERE id=?", (item_id,))
+        row = self._db.fetchone("SELECT order_id, kot_printed_qty FROM order_items WHERE id=?", (item_id,))
+        if row and float(row["kot_printed_qty"] or 0) > 0:
+            self._db.execute("UPDATE order_items SET qty=0 WHERE id=?", (item_id,))
+        else:
+            self._db.execute("DELETE FROM order_items WHERE id=?", (item_id,))
         if row:
             self._recalc(row["order_id"])
 
@@ -110,6 +143,9 @@ class OrderService:
 
     def set_waiter(self, order_id, waiter_id):
         self._db.execute("UPDATE orders SET waiter_id=? WHERE id=?", (waiter_id, order_id))
+
+    def set_rider(self, order_id, rider_id):
+        self._db.execute("UPDATE orders SET rider_id=? WHERE id=?", (rider_id, order_id))
 
     def set_service_charge(self, order_id, amount):
         self._db.execute(

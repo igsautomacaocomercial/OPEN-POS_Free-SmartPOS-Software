@@ -34,6 +34,7 @@ class SettingsView(QWidget):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_store_tab(), "Loja")
         self.tabs.addTab(self._build_tax_tab(), "Taxas e Recibo")
+        self.tabs.addTab(self._build_service_tab(), "Atendimento")
         self.tabs.addTab(self._build_printing_tab(), "Impressão")
         self.tabs.addTab(self._build_backup_tab(), "Backup / Restaurar")
         outer.addWidget(self.tabs, 1)
@@ -184,6 +185,48 @@ class SettingsView(QWidget):
             "receipt_show_address": "1" if self.rec_show_address.isChecked() else "0",
         })
         QMessageBox.information(self, "Salvo", "Configurações de taxas & recibo salvas.")
+
+    # ---------------- Service ----------------
+    def _build_service_tab(self):
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setSpacing(14)
+
+        card = QFrame()
+        card.setProperty("card", True)
+        cv = QVBoxLayout(card)
+        cv.setContentsMargins(20, 18, 20, 18)
+        cv.setSpacing(10)
+
+        title = QLabel("Mesas e Atendimento")
+        title.setStyleSheet("font-weight: 800; font-size: 15px;")
+        cv.addWidget(title)
+
+        hint = QLabel(
+            "Quando ativado, o sistema pede a seleção de um garçom ativo antes de lançar itens em mesas sem garçom."
+        )
+        hint.setProperty("muted", True)
+        hint.setWordWrap(True)
+        cv.addWidget(hint)
+
+        self.require_waiter_before_items = QCheckBox("Solicitar garçom antes de lançar itens na mesa")
+        cv.addWidget(self.require_waiter_before_items)
+
+        lay.addWidget(card)
+
+        save = QPushButton("Salvar Configurações de Atendimento")
+        save.setProperty("primary", True)
+        save.clicked.connect(self._save_service)
+        lay.addWidget(save, alignment=Qt.AlignRight)
+        lay.addStretch()
+        return w
+
+    def _save_service(self):
+        settings_service.set(
+            "require_waiter_before_items",
+            "1" if self.require_waiter_before_items.isChecked() else "0",
+        )
+        QMessageBox.information(self, "Salvo", "Configurações de atendimento salvas.")
 
     # ---------------- Printing ----------------
     def _build_printing_tab(self):
@@ -471,6 +514,7 @@ class SettingsView(QWidget):
         self.rec_footer.setText(s.get("receipt_footer"))
         self.rec_show_logo.setChecked(s.get("receipt_show_logo", "1") == "1")
         self.rec_show_address.setChecked(s.get("receipt_show_address", "1") == "1")
+        self.require_waiter_before_items.setChecked(s.get("require_waiter_before_items", "0") == "1")
         self._populate_printers(keep=s.get("printer_name", "").strip())
         enc = s.get("printer_encoding", "cp437")
         eidx = self.p_encoding.findText(enc)

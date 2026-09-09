@@ -136,7 +136,9 @@ CREATE TABLE IF NOT EXISTS order_items (
     name TEXT NOT NULL,
     price REAL NOT NULL DEFAULT 0,
     qty REAL NOT NULL DEFAULT 1,
-    instructions TEXT NOT NULL DEFAULT ''
+    instructions TEXT NOT NULL DEFAULT '',
+    kot_printed_qty REAL NOT NULL DEFAULT 0,
+    kot_printed_instructions TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS expense_categories (
@@ -235,6 +237,7 @@ _DEFAULT_SETTINGS = {
     "printer_cut": "1",
     "auto_backup": "0",
     "auto_backup_hours": "24",
+    "require_waiter_before_items": "0",
 }
 
 
@@ -323,6 +326,13 @@ class Database:
                 f"PRAGMA table_info({table})").fetchall()}
             if "account_id" not in cols:
                 self._conn.execute(f"ALTER TABLE {table} ADD COLUMN account_id INTEGER")
+        icols = {r["name"] for r in self._conn.execute("PRAGMA table_info(order_items)").fetchall()}
+        for name, ddl in {
+            "kot_printed_qty": "REAL NOT NULL DEFAULT 0",
+            "kot_printed_instructions": "TEXT NOT NULL DEFAULT ''",
+        }.items():
+            if name not in icols:
+                self._conn.execute(f"ALTER TABLE order_items ADD COLUMN {name} {ddl}")
         ccols = {r["name"] for r in self._conn.execute("PRAGMA table_info(customers)").fetchall()}
         for name, ddl in {
             "document": "TEXT NOT NULL DEFAULT ''",

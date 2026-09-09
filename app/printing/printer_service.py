@@ -172,7 +172,8 @@ def _info_lines(order, cashier_label=True, show_day=True, show_waiter=True, show
     if order.get("table_no"):
         lines.append(("Mesa", f"{order['table_no']}   Lugares: {order.get('seats', '-')}"))
     if show_waiter and order.get("waiter_name"):
-        lines.append(("Garçom", order["waiter_name"]))
+        label = "Atendente" if order.get("order_type") == "delivery" else "Garçom"
+        lines.append((label, order["waiter_name"]))
     if show_rider and order.get("rider_name"):
         lines.append(("Entregador", order["rider_name"]))
     if cashier_label and order.get("cashier_name"):
@@ -238,12 +239,17 @@ def _kot_item_lines(items, cols: int) -> list[str]:
     lines = []
     for it in items:
         name = str(it.get("name", "")).strip().upper()
+        action = str(it.get("kot_action") or "ADICIONAR").upper()
         qty = it.get("qty", 1)
         try:
             qty_s = f"{float(qty):g}"
         except (TypeError, ValueError):
             qty_s = str(qty)
         chunks = _fit(name, name_w)
+        if action == "CANCELAR":
+            lines.append("*** CANCELAR ITEM ***")
+        elif action == "ALTERAR OBS":
+            lines.append("*** ALTERAR OBSERVAÇÃO ***")
         for idx, chunk in enumerate(chunks):
             if idx == 0:
                 lines.append(f"{qty_s.rjust(qty_w)}{' ' * gap}{chunk}")
@@ -252,6 +258,8 @@ def _kot_item_lines(items, cols: int) -> list[str]:
         instr = str(it.get("instructions") or "").strip()
         if instr:
             lines.append(f"{indent}>>> {instr.upper()} <<<")
+        if action in ("CANCELAR", "ALTERAR OBS"):
+            lines.append("-" * cols)
     return lines
 
 
@@ -282,7 +290,8 @@ def _kot_text(order, items=None, title="KOT") -> str:
     if date_part or time_part:
         lines.append(f"{date_part} - {time_part}".center(cols))
     if order.get("waiter_name"):
-        lines.append(f"GARÇOM: {str(order['waiter_name']).upper()}".center(cols))
+        label = "ATENDENTE" if order.get("order_type") == "delivery" else "GARÇOM"
+        lines.append(f"{label}: {str(order['waiter_name']).upper()}".center(cols))
     lines.append("=" * cols)
     lines.append("QTD  PRODUTO")
     lines.append("=" * cols)
@@ -366,7 +375,8 @@ def _bill_text(order, title="CONTA", include_payment=False) -> str:
     if order.get("cashier_name"):
         lines.append(f"CAIXA: {order['cashier_name']}".center(cols))
     if order.get("waiter_name"):
-        lines.append(f"GARÇOM: {order['waiter_name']}".center(cols))
+        label = "ATENDENTE" if order.get("order_type") == "delivery" else "GARÇOM"
+        lines.append(f"{label}: {order['waiter_name']}".center(cols))
     lines.append("=" * cols)
     lines.extend(item_lines(items))
     lines.append("=" * cols)

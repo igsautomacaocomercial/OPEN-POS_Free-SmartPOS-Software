@@ -5,7 +5,16 @@ class TableService:
     def __init__(self):
         self._db = get_db()
 
+    def _repair_stale_statuses(self):
+        self._db.execute(
+            "UPDATE tables SET status='free', current_order_id=NULL "
+            "WHERE status!='free' AND (current_order_id IS NULL OR NOT EXISTS ("
+            "SELECT 1 FROM orders o WHERE o.id=tables.current_order_id "
+            "AND o.status IN ('open','request_bill')))"
+        )
+
     def list_all(self):
+        self._repair_stale_statuses()
         return self._db.fetchall(
             "SELECT t.*, o.waiter_id, w.name AS waiter_name, o.total AS current_total, "
             "o.created_at AS opened_at FROM tables t "
@@ -37,6 +46,7 @@ class TableService:
         self._db.execute("DELETE FROM tables WHERE id=?", (table_id,))
 
     def get(self, table_id):
+        self._repair_stale_statuses()
         return self._db.fetchone("SELECT * FROM tables WHERE id=?", (table_id,))
 
     def set_status(self, table_id, status, order_id=None):

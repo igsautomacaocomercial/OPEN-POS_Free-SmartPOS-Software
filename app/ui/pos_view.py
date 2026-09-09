@@ -52,7 +52,8 @@ class OrderDetailDialog(QDialog):
         info = []
         info.append(f"Data:   {fmt_datetime(order['created_at'])}")
         if order.get("waiter_name"):
-            info.append(f"Garçom:   {order['waiter_name']}")
+            label = "Atendente" if order.get("order_type") == "delivery" else "Garçom"
+            info.append(f"{label}:   {order['waiter_name']}")
         if order.get("rider_name"):
             info.append(f"Motoqueiro:   {order['rider_name']}")
         if order.get("customer_name"):
@@ -171,22 +172,85 @@ class QuickSalePage(QWidget):
 
         row1 = QHBoxLayout()
         row1.setSpacing(10)
-        row1.addWidget(QLabel("Garçom:"))
+
+        if self.order_type == "delivery":
+            section = QLabel("Cliente")
+            section.setStyleSheet("font-weight: 800; color: #111827;")
+            vh.addWidget(section)
+
+            customer_row = QHBoxLayout()
+            customer_row.setSpacing(10)
+            self.phone = QLineEdit()
+            self.phone.setPlaceholderText("Telefone do cliente")
+            self.phone.setMinimumWidth(190)
+            self.phone.setStyleSheet(
+                "QLineEdit {"
+                "background-color: #E0F7FA;"
+                "border: 2px solid #0288D1;"
+                "border-radius: 8px;"
+                "padding: 8px 12px;"
+                "font-size: 13px;"
+                "font-weight: 700;"
+                "color: #000000;"
+                "}"
+            )
+            self.phone.editingFinished.connect(self._lookup_customer)
+            self.customer = QLineEdit()
+            self.customer.setPlaceholderText("Nome do cliente")
+            self.customer.setMinimumWidth(180)
+            self.btn_new_customer = QPushButton("+ Cadastrar Cliente")
+            self.btn_new_customer.setProperty("warning", True)
+            self.btn_new_customer.clicked.connect(self._register_customer)
+            self.btn_edit_customer = QPushButton("   Editar Cliente")
+            self.btn_edit_customer.setIcon(make_icon("pencil", "#4b5563", 24))
+            self.btn_edit_customer.setIconSize(QSize(18, 18))
+            self.btn_edit_customer.clicked.connect(self._edit_customer)
+            customer_row.addWidget(self.phone)
+            customer_row.addWidget(self.customer, 1)
+            customer_row.addWidget(self.btn_new_customer)
+            customer_row.addWidget(self.btn_edit_customer)
+            vh.addLayout(customer_row)
+
+            section = QLabel("Entrega")
+            section.setStyleSheet("font-weight: 800; color: #111827;")
+            vh.addWidget(section)
+
+            delivery_row = QHBoxLayout()
+            delivery_row.setSpacing(10)
+            self.address = QLineEdit()
+            self.address.setPlaceholderText("Endereço de entrega")
+            self.address.setMinimumWidth(260)
+            self.address_number = QLineEdit()
+            self.address_number.setPlaceholderText("Nº")
+            self.address_number.setMinimumWidth(70)
+            self.address_complement = QLineEdit()
+            self.address_complement.setPlaceholderText("Complemento")
+            self.address_complement.setMinimumWidth(130)
+            self.neighborhood = QComboBox()
+            self.neighborhood.setMinimumWidth(150)
+            self.neighborhood.addItem("— Bairro —", None)
+            for nb in neighborhood_service.list_active():
+                self.neighborhood.addItem(nb["name"], nb["id"])
+            self.neighborhood.currentIndexChanged.connect(self._neighborhood_changed)
+            delivery_row.addWidget(self.address, 2)
+            delivery_row.addWidget(self.address_number)
+            delivery_row.addWidget(self.address_complement, 1)
+            delivery_row.addWidget(self.neighborhood)
+            vh.addLayout(delivery_row)
+
+            section = QLabel("Operação")
+            section.setStyleSheet("font-weight: 800; color: #111827;")
+            vh.addWidget(section)
+
+        attendant_label = "Atendente:" if self.order_type == "delivery" else "Garçom:"
+        row1.addWidget(QLabel(attendant_label))
         self.waiter = QComboBox()
         self.waiter.setMinimumWidth(150)
         self.waiter.addItem("— Selecionar —", None)
         for s in staff_service.list_waiters():
             self.waiter.addItem(s["name"], s["id"])
+        self.waiter.currentIndexChanged.connect(self._waiter_changed)
         row1.addWidget(self.waiter)
-
-        if self.order_type == "delivery":
-            row1.addWidget(QLabel("Motoqueiro:"))
-            self.rider = QComboBox()
-            self.rider.setMinimumWidth(140)
-            self.rider.addItem("— Selecionar —", None)
-            for s in staff_service.list_riders():
-                self.rider.addItem(s["name"], s["id"])
-            row1.addWidget(self.rider)
         row1.addStretch()
         charge = settings_service.get_float(
             "delivery_charge" if self.order_type == "delivery" else "takeaway_charge", 0
@@ -196,65 +260,10 @@ class QuickSalePage(QWidget):
         )
         self.charge_lbl.setStyleSheet("font-weight: 700; color: #4f46e5;")
         row1.addWidget(self.charge_lbl)
+        self.payment_status = QLabel("Pagamento: não definido")
+        self.payment_status.setStyleSheet("font-weight: 700; color: #6b7280;")
+        row1.addWidget(self.payment_status)
         vh.addLayout(row1)
-
-        if self.order_type == "delivery":
-            row2 = QHBoxLayout()
-            row2.setSpacing(10)
-            # Telefone em primeiro lugar, destacado visualmente
-            self.phone = QLineEdit()
-            self.phone.setPlaceholderText("Telefone do cliente")
-            self.phone.setMinimumWidth(180)
-            # Fundo destaque e border radius para o campo telefone
-            self.phone.setStyleSheet(
-                "QLineEdit {\n"
-                "   background-color: #E0F7FA;\n"
-                "   border: 2px solid #0288D1;\n"
-                "   border-radius: 8px;\n"
-                "   padding: 8px 12px;\n"
-                "   font-size: 13px;\n"
-                "   font-weight: 700;\n"
-                "   color: #000000;\n"
-                "}"
-            )
-            self.phone.editingFinished.connect(self._lookup_customer)
-            # Nome do cliente em segundo lugar
-            self.customer = QLineEdit()
-            self.customer.setPlaceholderText("Nome do cliente")
-            self.customer.setMinimumWidth(160)
-            # Endereço de entrega em terceiro lugar
-            self.address = QLineEdit()
-            self.address.setPlaceholderText("Endereço de entrega")
-            self.address.setMinimumWidth(220)
-            self.address_number = QLineEdit()
-            self.address_number.setPlaceholderText("Nº")
-            self.address_number.setMinimumWidth(70)
-            self.address_complement = QLineEdit()
-            self.address_complement.setPlaceholderText("Complemento")
-            self.address_complement.setMinimumWidth(120)
-            self.neighborhood = QComboBox()
-            self.neighborhood.setMinimumWidth(130)
-            self.neighborhood.addItem("— Bairro —", None)
-            for nb in neighborhood_service.list_active():
-                self.neighborhood.addItem(nb["name"], nb["id"])
-            self.neighborhood.currentIndexChanged.connect(self._neighborhood_changed)
-            self.btn_new_customer = QPushButton("+ Cadastrar Cliente")
-            self.btn_new_customer.setProperty("warning", True)
-            self.btn_new_customer.clicked.connect(self._register_customer)
-            self.btn_edit_customer = QPushButton("   Editar Cliente")
-            self.btn_edit_customer.setIcon(make_icon("pencil", "#4b5563", 24))
-            self.btn_edit_customer.setIconSize(QSize(18, 18))
-            self.btn_edit_customer.clicked.connect(self._edit_customer)
-            row2.addWidget(self.phone)
-            row2.addWidget(self.customer)
-            row2.addWidget(self.address)
-            row2.addWidget(self.address_number)
-            row2.addWidget(self.address_complement)
-            row2.addWidget(self.neighborhood)
-            row2.addWidget(self.btn_new_customer)
-            row2.addWidget(self.btn_edit_customer)
-            row2.addStretch()
-            vh.addLayout(row2)
         lay.addWidget(head)
 
         self.cart = CartPanel()
@@ -273,12 +282,20 @@ class QuickSalePage(QWidget):
         self.btn_payment.setIcon(make_icon("card", "#4f46e5", 24))
         self.btn_payment.setIconSize(QSize(18, 18))
         self.btn_payment.clicked.connect(self._select_payment_method)
+        if self.order_type == "takeaway":
+            self.btn_finalize_now = QPushButton("   Finalizar Venda")
+            self.btn_finalize_now.setProperty("success", True)
+            self.btn_finalize_now.setIcon(make_icon("check", "#ffffff", 24))
+            self.btn_finalize_now.setIconSize(QSize(18, 18))
+            self.btn_finalize_now.clicked.connect(self._finalize_now)
         self.btn_clear = QPushButton("   Limpar Pedido")
         self.btn_clear.setIcon(make_icon("trash", "#ef4444", 24))
         self.btn_clear.setIconSize(QSize(18, 18))
         self.btn_clear.clicked.connect(self._clear)
         actions.addWidget(self.btn_kot)
         actions.addWidget(self.btn_payment)
+        if self.order_type == "takeaway":
+            actions.addWidget(self.btn_finalize_now)
         actions.addStretch()
         actions.addWidget(self.btn_clear)
         lay.addLayout(actions)
@@ -303,19 +320,18 @@ class QuickSalePage(QWidget):
         return ", ".join(p for p in parts if p)
 
     def _ensure_order(self):
+        if self.order_type == "delivery" and not self._ensure_delivery_attendant():
+            return None
         if self.order_id is not None:
             return self.order_id
         waiter_id = self.waiter.currentData()
         if waiter_id is None:
-            QMessageBox.warning(self, "Garçom Obrigatório", "Selecione um garçom primeiro.")
+            label = "atendente" if self.order_type == "delivery" else "garçom"
+            QMessageBox.warning(self, "Atendimento", f"Selecione um {label} primeiro.")
             return None
         rider_id = None
         customer_name = customer_phone = customer_address = ""
         if self.order_type == "delivery":
-            rider_id = self.rider.currentData()
-            if rider_id is None:
-                QMessageBox.warning(self, "Motoqueiro Obrigatório", "Selecione um motoqueiro primeiro.")
-                return None
             customer_name = self.customer.text().strip()
             customer_phone = self.phone.text().strip()
             customer_address = self._delivery_address()
@@ -342,12 +358,97 @@ class QuickSalePage(QWidget):
         self.payment_selected = False
         return self.order_id
 
+    def _sync_order_header(self):
+        if self.order_id is None or self.order_type != "delivery":
+            return
+        order = order_service.get(self.order_id)
+        order_service.set_customer_info(
+            self.order_id,
+            customer_id=order["customer_id"] if order else None,
+            name=self.customer.text().strip(),
+            phone=self.phone.text().strip(),
+            address=self._delivery_address(),
+        )
+        order_service.set_service_charge(self.order_id, self._delivery_charge())
+
     def _add_product(self, product_id):
         oid = self._ensure_order()
         if oid is None:
             return
         order_service.add_item(oid, product_id=product_id, qty=1)
         self.cart.refresh()
+
+    def _ensure_delivery_attendant(self):
+        if self.order_type != "delivery" or self.waiter.currentData() is not None:
+            return True
+        attendant_id = self._select_attendant_touch()
+        if attendant_id is None:
+            return False
+        idx = self.waiter.findData(attendant_id)
+        if idx >= 0:
+            self.waiter.setCurrentIndex(idx)
+            if self.order_id is not None:
+                order_service.set_waiter(self.order_id, attendant_id)
+            return True
+        QMessageBox.warning(self, "Atendente", "Não foi possível selecionar o atendente.")
+        return False
+
+    def _select_attendant_touch(self):
+        attendants = staff_service.list_waiters()
+        if not attendants:
+            QMessageBox.information(self, "Atendente", "Nenhum atendente ativo cadastrado.")
+            return None
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Selecionar Atendente")
+        dlg.setModal(True)
+        dlg.resize(520, 420)
+        selected = {"id": None}
+
+        root = QVBoxLayout(dlg)
+        root.setContentsMargins(18, 16, 18, 16)
+        root.setSpacing(12)
+
+        title = QLabel("Selecione o atendente do delivery")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 18px; font-weight: 800; color: #111827;")
+        root.addWidget(title)
+
+        hint = QLabel("O item será lançado após a seleção.")
+        hint.setAlignment(Qt.AlignCenter)
+        hint.setProperty("muted", True)
+        root.addWidget(hint)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        list_widget = QWidget()
+        list_box = QVBoxLayout(list_widget)
+        list_box.setSpacing(10)
+        for attendant in attendants:
+            btn = QPushButton(attendant["name"])
+            btn.setMinimumHeight(54)
+            btn.setStyleSheet("font-size: 16px; font-weight: 700; text-align: left; padding: 8px 16px;")
+            btn.clicked.connect(lambda _=False, aid=attendant["id"]: self._accept_attendant_touch(dlg, selected, aid))
+            list_box.addWidget(btn)
+        list_box.addStretch()
+        scroll.setWidget(list_widget)
+        root.addWidget(scroll, 1)
+
+        cancel = QPushButton("Cancelar")
+        cancel.setMinimumHeight(42)
+        cancel.clicked.connect(dlg.reject)
+        root.addWidget(cancel, alignment=Qt.AlignRight)
+
+        return selected["id"] if dlg.exec() else None
+
+    def _accept_attendant_touch(self, dlg, selected, attendant_id):
+        selected["id"] = attendant_id
+        dlg.accept()
+
+    def _waiter_changed(self, idx):
+        if self.order_id is not None:
+            order_service.set_waiter(self.order_id, self.waiter.currentData())
 
     def _neighborhood_changed(self, idx):
         fee = self._delivery_charge()
@@ -364,8 +465,14 @@ class QuickSalePage(QWidget):
             if self.payment_method == "Dinheiro" and self.payment_change_needed:
                 label += f" · Troco {fmt_money(self.payment_change_amount, settings_service.get('currency', 'R$'))}"
             self.btn_payment.setText(f"   Pagamento: {label}")
+            if hasattr(self, "payment_status"):
+                self.payment_status.setText(f"Pagamento: {label}")
+                self.payment_status.setStyleSheet("font-weight: 800; color: #10b981;")
         else:
             self.btn_payment.setText("   Forma de Pagamento")
+            if hasattr(self, "payment_status"):
+                self.payment_status.setText("Pagamento: não definido")
+                self.payment_status.setStyleSheet("font-weight: 700; color: #6b7280;")
 
     def _select_payment_method(self):
         oid = self._ensure_order()
@@ -621,6 +728,7 @@ class QuickSalePage(QWidget):
         if not order_service.get_items(oid):
             QMessageBox.information(self, "Pedido Vazio", "Adicione itens primeiro.")
             return
+        self._sync_order_header()
         order = order_service.get(oid)
         if self.order_type == "delivery":
             if not self.payment_selected:
@@ -633,7 +741,7 @@ class QuickSalePage(QWidget):
                 QMessageBox.information(self, "KOT", "Não há novos itens para imprimir.")
                 return
             print_kot(order, items=items)
-            order_service.mark_kot_printed(order["id"], items[-1]["id"])
+            order_service.mark_kot_printed(order["id"], items)
         except Exception as e:
             QMessageBox.critical(self, "Erro de Impressão", str(e))
             return
@@ -649,13 +757,43 @@ class QuickSalePage(QWidget):
         self.tabs.setCurrentIndex(1)
         self._refresh_tab()
 
+    def _finalize_now(self):
+        oid = self._ensure_order()
+        if oid is None:
+            return
+        if not order_service.get_items(oid):
+            QMessageBox.information(self, "Pedido Vazio", "Adicione itens primeiro.")
+            return
+        if not self.payment_selected:
+            if not self._select_payment_method():
+                return
+        order = _as_dict(order_service.get(oid))
+        payment_method = order.get("payment_method") or self.payment_method or "Dinheiro"
+        try:
+            print_final_bill(order)
+        except Exception as e:
+            QMessageBox.critical(self, "Erro de Impressão", str(e))
+            return
+        order_service.finalize(oid, payment_method)
+        self.order_id = None
+        self.payment_confirmed = False
+        self.payment_selected = False
+        self.payment_method = "Dinheiro"
+        self.payment_change_needed = False
+        self.payment_change_amount = 0.0
+        self._sync_payment_button()
+        self.cart.load_order(None)
+        self.cart.load_categories()
+        self.tabs.setCurrentIndex(2)
+        self._refresh_tab()
+
     def _clear(self):
         if self.order_id is not None:
             if order_service.get_items(self.order_id):
                 resp = QMessageBox.question(
                     self, "Descartar Pedido", "Este pedido tem itens. Descartar?")
-            if resp != QMessageBox.Yes:
-                return
+                if resp != QMessageBox.Yes:
+                    return
             order_service.manual_close(self.order_id)
             self.order_id = None
             self.payment_confirmed = False
@@ -862,10 +1000,15 @@ class QuickSalePage(QWidget):
             out = []
             for it in order_items:
                 name = str(it.get("name", "")).strip().upper()
+                action = str(it.get("kot_action") or "ADICIONAR").upper()
                 try:
                     qty_s = f"{float(it.get('qty', 1)):g}"
                 except (TypeError, ValueError):
                     qty_s = str(it.get("qty", 1))
+                if action == "CANCELAR":
+                    out.append("*** CANCELAR ITEM ***")
+                elif action == "ALTERAR OBS":
+                    out.append("*** ALTERAR OBSERVAÇÃO ***")
                 chunks = []
                 cur = ""
                 for word in name.split():
@@ -889,6 +1032,8 @@ class QuickSalePage(QWidget):
                 instr = str(it.get("instructions") or "").strip()
                 if instr:
                     out.append(f"{indent}>>> {instr.upper()} <<<")
+                if action in ("CANCELAR", "ALTERAR OBS"):
+                    out.append("-" * width)
             return out
 
         lines = [
@@ -903,7 +1048,8 @@ class QuickSalePage(QWidget):
         if date_part or time_part:
             lines.append(f"{date_part} - {time_part}".center(width))
         if order.get("waiter_name"):
-            lines.append(f"GARÇOM: {str(order['waiter_name']).upper()}".center(width))
+            label = "ATENDENTE" if order.get("order_type") == "delivery" else "GARÇOM"
+            lines.append(f"{label}: {str(order['waiter_name']).upper()}".center(width))
         lines.append("=" * width)
         lines.append("QTD  PRODUTO")
         lines.append("=" * width)
@@ -925,7 +1071,8 @@ class QuickSalePage(QWidget):
     def _meta_line(self, order):
         parts = []
         if order.get("waiter_name"):
-            parts.append(f"Garçom: {order['waiter_name']}")
+            label = "Atendente" if order.get("order_type") == "delivery" else "Garçom"
+            parts.append(f"{label}: {order['waiter_name']}")
         if order.get("rider_name"):
             parts.append(f"Motoqueiro: {order['rider_name']}")
         if order.get("payment_method"):
@@ -941,6 +1088,8 @@ class QuickSalePage(QWidget):
         return "   |   ".join(parts)
 
     def _complete(self, order_id):
+        if self.order_type == "delivery" and not self._ensure_rider_for_delivery(order_id):
+            return
         order = _as_dict(order_service.get(order_id))
         payment_method = order.get("payment_method") or (self.payment_method if self.order_type == "delivery" else "Dinheiro")
         if not payment_method:
@@ -994,8 +1143,6 @@ class QuickSalePage(QWidget):
         idx = self.waiter.findData(order["waiter_id"])
         self.waiter.setCurrentIndex(max(0, idx))
         if self.order_type == "delivery":
-            idx = self.rider.findData(order["rider_id"])
-            self.rider.setCurrentIndex(max(0, idx))
             self.customer.setText(order["customer_name"] or "")
             self.phone.setText(order["customer_phone"] or "")
             self.address.setText(order["customer_address"] or "")
@@ -1076,6 +1223,23 @@ class QuickSalePage(QWidget):
                 self.neighborhood.setCurrentIndex(idx)
     def refresh(self):
         self._refresh_tab()
+
+    def _ensure_rider_for_delivery(self, order_id):
+        order = _as_dict(order_service.get(order_id))
+        if order.get("rider_id"):
+            return True
+        riders = staff_service.list_riders()
+        if not riders:
+            QMessageBox.information(self, "Motoqueiro", "Nenhum motoqueiro ativo cadastrado.")
+            return False
+        names = [r["name"] for r in riders]
+        name, ok = QInputDialog.getItem(
+            self, "Motoqueiro", "Selecione o motoqueiro para concluir a entrega:", names, 0, False)
+        if not ok or not name:
+            return False
+        rider = next(r for r in riders if r["name"] == name)
+        order_service.set_rider(order_id, rider["id"])
+        return True
 
 
 class PosView(QWidget):

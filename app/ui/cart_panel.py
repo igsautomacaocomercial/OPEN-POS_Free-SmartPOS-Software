@@ -68,6 +68,7 @@ class CartPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.order_id = None
+        self.before_item_increase = None
         self._build()
 
     def _build(self):
@@ -327,6 +328,8 @@ class CartPanel(QFrame):
         return frame
 
     def _change_qty(self, item_id, delta):
+        if delta > 0 and callable(self.before_item_increase) and not self.before_item_increase():
+            return
         items = order_service.get_items(self.order_id)
         current = next((i for i in items if i["id"] == item_id), None)
         if not current:

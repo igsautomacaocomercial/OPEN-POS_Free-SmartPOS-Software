@@ -1,7 +1,7 @@
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QDoubleSpinBox, QFrame, QFormLayout, QHBoxLayout, QHeaderView,
-    QInputDialog, QLabel, QMessageBox, QPushButton, QSizePolicy, QSpinBox, QTableWidget,
+    QInputDialog, QLabel, QMessageBox, QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTableWidget,
     QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
 )
 
@@ -301,6 +301,7 @@ class TablePopup(QDialog):
         root.addLayout(head)
 
         self.cart = CartPanel()
+        self.cart.before_item_increase = self._ensure_waiter_for_items
         self.cart.grid.product_clicked.connect(self._add_product)
         self.cart.load_categories()
         root.addWidget(self.cart, 1)
@@ -406,9 +407,79 @@ class TablePopup(QDialog):
         return self.order
 
     def _add_product(self, product_id):
+        if not self._ensure_waiter_for_items():
+            return
         order = self._ensure_order()
         order_service.add_item(order["id"], product_id=product_id, qty=1)
         self.cart.refresh()
+
+    def _ensure_waiter_for_items(self):
+        if settings_service.get("require_waiter_before_items", "0") != "1":
+            return True
+        if self.waiter.currentData() is not None:
+            return True
+        waiter_id = self._select_waiter_touch()
+        if waiter_id is None:
+            return False
+        idx = self.waiter.findData(waiter_id)
+        if idx >= 0:
+            self.waiter.setCurrentIndex(idx)
+            return True
+        QMessageBox.warning(self, "Garçom", "Não foi possível selecionar o garçom.")
+        return False
+
+    def _select_waiter_touch(self):
+        waiters = staff_service.list_waiters()
+        if not waiters:
+            QMessageBox.information(self, "Garçom", "Nenhum garçom ativo cadastrado.")
+            return None
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Selecionar Garçom")
+        dlg.setModal(True)
+        dlg.resize(520, 420)
+        selected = {"id": None}
+
+        root = QVBoxLayout(dlg)
+        root.setContentsMargins(18, 16, 18, 16)
+        root.setSpacing(12)
+
+        title = QLabel("Selecione o garçom para esta mesa")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 18px; font-weight: 800; color: #111827;")
+        root.addWidget(title)
+
+        hint = QLabel("O item será lançado após a seleção.")
+        hint.setAlignment(Qt.AlignCenter)
+        hint.setProperty("muted", True)
+        root.addWidget(hint)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        list_widget = QWidget()
+        list_box = QVBoxLayout(list_widget)
+        list_box.setSpacing(10)
+        for waiter in waiters:
+            btn = QPushButton(waiter["name"])
+            btn.setMinimumHeight(54)
+            btn.setStyleSheet("font-size: 16px; font-weight: 700; text-align: left; padding: 8px 16px;")
+            btn.clicked.connect(lambda _=False, wid=waiter["id"]: self._accept_waiter_touch(dlg, selected, wid))
+            list_box.addWidget(btn)
+        list_box.addStretch()
+        scroll.setWidget(list_widget)
+        root.addWidget(scroll, 1)
+
+        cancel = QPushButton("Cancelar")
+        cancel.setMinimumHeight(42)
+        cancel.clicked.connect(dlg.reject)
+        root.addWidget(cancel, alignment=Qt.AlignRight)
+
+        return selected["id"] if dlg.exec() else None
+
+    def _accept_waiter_touch(self, dlg, selected, waiter_id):
+        selected["id"] = waiter_id
+        dlg.accept()
 
     def _waiter_changed(self, idx):
         if self.order is not None:
@@ -425,7 +496,7 @@ class TablePopup(QDialog):
                 QMessageBox.information(self, "KOT", "Não há novos itens para imprimir.")
                 return
             print_kot(order, items=items)
-            order_service.mark_kot_printed(order["id"], items[-1]["id"])
+            order_service.mark_kot_printed(order["id"], items)
         except Exception as e:
             QMessageBox.critical(self, "Erro de Impressão", str(e))
 
@@ -451,7 +522,7 @@ class TablePopup(QDialog):
             items = order_service.get_pending_kot_items(self.order["id"])
             if items:
                 print_kot(_as_dict(order_service.get(self.order["id"])), items=items)
-                order_service.mark_kot_printed(self.order["id"], items[-1]["id"])
+                order_service.mark_kot_printed(self.order["id"], items)
         except Exception as e:
             QMessageBox.critical(self, "Erro de Impressão", str(e))
             return
@@ -537,7 +608,8 @@ class TablePopup(QDialog):
         order_for_print["payment_details"] = payload["payment_details"]
         order_for_print["total"] = payload["total"]
 
-        if not self._preview_final_bill(order_for_print):
+        print_bill = self._preview_final_bill(order_for_print)
+        if print_bill is None:
             return
 
         try:
@@ -549,11 +621,23 @@ class TablePopup(QDialog):
                 payment_details=payload["payment_details"],
             )
             order_service.finalize(order["id"], payload["payment_method"], payload["payment_details"])
+            table_service.set_status(self.table["id"], "free", None)
             self.table["status"] = "free"
-            print_final_bill(order_service.get(order["id"]))
+            self.order = None
+            self.cart.load_order(None)
         except Exception as e:
-            QMessageBox.critical(self, "Erro de Impressão", str(e))
+            QMessageBox.critical(self, "Finalizar Venda", str(e))
             return
+
+        if print_bill:
+            try:
+                print_final_bill(order_service.get(order["id"]))
+            except Exception as e:
+                QMessageBox.warning(
+                    self,
+                    "Erro de Impressão",
+                    f"A venda foi finalizada e a mesa foi liberada, mas a impressão falhou.\n\n{e}",
+                )
         self.accept()
 
     def _preview_final_bill(self, order):
@@ -606,15 +690,23 @@ class TablePopup(QDialog):
 
         btns = QHBoxLayout()
         btns.addStretch()
-        close = QPushButton("Fechar")
-        close.clicked.connect(dlg.reject)
+        cancel = QPushButton("Cancelar")
+        cancel.clicked.connect(dlg.reject)
+        no_print = QPushButton("Fechar sem Imprimir")
+        no_print.clicked.connect(lambda: dlg.done(2))
         print_btn = QPushButton("Imprimir")
         print_btn.setProperty("primary", True)
         print_btn.clicked.connect(dlg.accept)
-        btns.addWidget(close)
+        btns.addWidget(cancel)
+        btns.addWidget(no_print)
         btns.addWidget(print_btn)
         root.addLayout(btns)
-        return dlg.exec()
+        result = dlg.exec()
+        if result == QDialog.Accepted:
+            return True
+        if result == 2:
+            return False
+        return None
 
     def _final_bill_preview_text(self, order):
         order = _as_dict(order)
