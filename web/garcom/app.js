@@ -99,6 +99,7 @@ async function loadTables() {
   const list = $('tables-list');
   list.innerHTML = '<p>Carregando mesas...</p>';
   try {
+    refreshQrBadge();
     const tables = await api('/api/waiter/tables');
     list.innerHTML = '';
     tables.forEach((table) => {
@@ -112,6 +113,14 @@ async function loadTables() {
     toast(err.message);
     if (err.message.includes('Sessao')) logout();
   }
+}
+
+async function refreshQrBadge() {
+  try {
+    const requests = await api('/api/waiter/qr-requests');
+    const count = requests.length;
+    $('qr-requests-btn').textContent = count ? `Pedidos QR (${count})` : 'Pedidos QR';
+  } catch (_) {}
 }
 
 async function loadQrRequests() {
@@ -155,6 +164,7 @@ async function handleQr(requestId, action) {
     await api(`/api/waiter/qr-requests/${requestId}/${action}`, {method: 'POST'});
     toast(action === 'accept' ? 'Pedido aceito.' : 'Pedido rejeitado.');
     await loadQrRequests();
+    await refreshQrBadge();
   } catch (err) {
     toast(err.message);
   }
@@ -390,6 +400,10 @@ window.addEventListener('appinstalled', () => {
   state.installPrompt = null;
   $('install-btn').classList.add('hidden');
 });
+
+setInterval(() => {
+  if (state.token && $('tables-screen').classList.contains('active')) refreshQrBadge();
+}, 10000);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

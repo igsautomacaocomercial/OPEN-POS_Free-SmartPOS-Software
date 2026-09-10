@@ -1,3 +1,6 @@
+import socket
+import webbrowser
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDoubleSpinBox, QFrame, QHBoxLayout, QInputDialog,
@@ -93,11 +96,14 @@ class AuxiliariesView(QWidget):
         row_btns = QHBoxLayout()
         edit = QPushButton("Editar")
         edit.clicked.connect(self._edit_table)
+        qr = QPushButton("Abrir QR")
+        qr.clicked.connect(self._open_table_qr)
         delete = QPushButton("Excluir")
         delete.setProperty("danger", True)
         delete.clicked.connect(self._delete_table)
         row_btns.addStretch()
         row_btns.addWidget(edit)
+        row_btns.addWidget(qr)
         row_btns.addWidget(delete)
         lay.addLayout(row_btns)
         self.refresh_tables()
@@ -159,6 +165,26 @@ class AuxiliariesView(QWidget):
             self.refresh_tables()
         except ValueError as e:
             QMessageBox.warning(self, "Não é Possível Excluir", str(e))
+
+    def _local_ip(self):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                return s.getsockname()[0]
+        except Exception:
+            try:
+                return socket.gethostbyname(socket.gethostname())
+            except Exception:
+                return "127.0.0.1"
+
+    def _open_table_qr(self):
+        t = self._selected_table()
+        if not t:
+            QMessageBox.information(self, "QR da Mesa", "Selecione uma mesa.")
+            return
+        port = settings_service.get("local_api_port", "8080") or "8080"
+        url = f"http://{self._local_ip()}:{port}/cardapio/qr/{t['id']}.svg"
+        webbrowser.open(url)
 
     # ---------------- Customers ----------------
     def _style_aux_table(self, table):

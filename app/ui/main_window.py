@@ -14,6 +14,7 @@ from app.ui.finance_view import FinanceView
 from app.ui.icons import icon_pixmap, make_icon
 from app.ui.pos_view import PosView
 from app.ui.products_view import ProductsView
+from app.ui.qr_orders_view import QrOrdersView
 from app.ui.reports_view import ReportsView
 from app.ui.auxiliaries_view import AuxiliariesView
 from app.ui.settings_view import SettingsView
@@ -27,6 +28,7 @@ NAV = [
     ("dashboard", "dashboard", "Painel"),
     ("pos", "bag", "Venda Rápida"),
     ("dining", "table", "Salão"),
+    ("qr_orders", "note", "Pedidos QR"),
     ("products", "cup", "Produtos"),
     ("expenses", "coins", "Despesas"),
     ("finance", "card", "Financeiro"),
@@ -36,9 +38,9 @@ NAV = [
 ]
 
 ROLE_ACCESS = {
-    "admin": {"dashboard", "pos", "dining", "products", "expenses", "finance", "reports", "settings", "auxiliares"},
-    "manager": {"dashboard", "pos", "dining", "products", "expenses", "finance", "reports", "auxiliares"},
-    "cashier": {"dashboard", "pos", "dining", "expenses"},
+    "admin": {"dashboard", "pos", "dining", "qr_orders", "products", "expenses", "finance", "reports", "settings", "auxiliares"},
+    "manager": {"dashboard", "pos", "dining", "qr_orders", "products", "expenses", "finance", "reports", "auxiliares"},
+    "cashier": {"dashboard", "pos", "dining", "qr_orders", "expenses"},
 }
 
 
@@ -194,6 +196,8 @@ class MainWindow(QMainWindow):
             return PosView()
         if key == "dining":
             return DiningView()
+        if key == "qr_orders":
+            return QrOrdersView()
         if key == "products":
             return ProductsView()
         if key == "expenses":

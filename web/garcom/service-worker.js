@@ -1,8 +1,8 @@
-const CACHE_NAME = 'openpos-garcom-v8';
+const CACHE_NAME = 'openpos-garcom-v9';
 const ASSETS = [
   '/garcom',
-  '/garcom/assets/styles.css?v=8',
-  '/garcom/assets/app.js?v=8',
+  '/garcom/assets/styles.css?v=9',
+  '/garcom/assets/app.js?v=9',
   '/garcom/assets/manifest.webmanifest',
   '/garcom/assets/icon.svg',
 ];
