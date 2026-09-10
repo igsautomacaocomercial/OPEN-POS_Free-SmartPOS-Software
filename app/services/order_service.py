@@ -42,6 +42,9 @@ class OrderService:
             "SELECT * FROM order_items WHERE order_id=? AND qty>0 ORDER BY id", (order_id,)
         )
 
+    def get_item(self, item_id):
+        return self._db.fetchone("SELECT * FROM order_items WHERE id=?", (item_id,))
+
     def get_pending_kot_items(self, order_id):
         items = self._db.fetchall("SELECT * FROM order_items WHERE order_id=? ORDER BY id", (order_id,))
         pending = []
@@ -95,18 +98,34 @@ class OrderService:
             (table_id,),
         )
 
-    def add_item(self, order_id, product_id=None, name=None, price=0.0, qty=1, instructions=""):
+    def get_item_addons(self, item_id):
+        return self._db.fetchall(
+            "SELECT * FROM order_item_addons WHERE order_item_id=? ORDER BY id", (item_id,)
+        )
+
+    def add_item(self, order_id, product_id=None, name=None, price=0.0, qty=1, instructions="", addons=None):
         if product_id:
             product = self._db.fetchone("SELECT * FROM products WHERE id=?", (product_id,))
             if not product:
                 raise ValueError("Produto não encontrado.")
             name = product["name"]
             price = product["price"]
-        self._db.execute(
+        item_id = self._db.execute(
             "INSERT INTO order_items (order_id, product_id, name, price, qty, instructions) VALUES (?,?,?,?,?,?)",
             (order_id, product_id, name, price, qty, instructions),
         )
+        for addon in addons or []:
+            addon_id = int(addon.get("addon_id") or addon.get("id") or 0)
+            addon_qty = float(addon.get("qty") or 1)
+            row = self._db.fetchone("SELECT * FROM add_ons WHERE id=? AND is_active=1", (addon_id,))
+            if not row or addon_qty <= 0:
+                continue
+            self._db.execute(
+                "INSERT INTO order_item_addons (order_item_id, addon_id, name, price, qty) VALUES (?,?,?,?,?)",
+                (item_id, row["id"], row["name"], row["price"], addon_qty),
+            )
         self._recalc(order_id)
+        return item_id
 
     def update_qty(self, item_id, qty):
         if qty <= 0:
@@ -210,10 +229,15 @@ class OrderService:
             raise ValueError("Pedidos não encontrados.")
         items = self.get_items(source_id)
         for it in items:
-            self._db.execute(
+            new_item_id = self._db.execute(
                 "INSERT INTO order_items (order_id, product_id, name, price, qty, instructions) "
                 "VALUES (?,?,?,?,?,?)",
                 (target_id, it["product_id"], it["name"], it["price"], it["qty"], it["instructions"]))
+            for addon in self.get_item_addons(it["id"]):
+                self._db.execute(
+                    "INSERT INTO order_item_addons (order_item_id, addon_id, name, price, qty) VALUES (?,?,?,?,?)",
+                    (new_item_id, addon["addon_id"], addon["name"], addon["price"], addon["qty"]),
+                )
         self._db.execute("DELETE FROM order_items WHERE order_id=?", (source_id,))
         self._recalc(target_id)
         self.manual_close(source_id)
@@ -221,7 +245,13 @@ class OrderService:
     def _recalc(self, order_id):
         order = self.get(order_id)
         items = self.get_items(order_id)
-        subtotal = round(sum(float(i["price"]) * float(i["qty"]) for i in items), 2)
+        subtotal = 0.0
+        for item in items:
+            item_qty = float(item["qty"] or 0)
+            addons = self.get_item_addons(item["id"])
+            addons_total = sum(float(a["price"] or 0) * float(a["qty"] or 0) for a in addons)
+            subtotal += (float(item["price"] or 0) + addons_total) * item_qty
+        subtotal = round(subtotal, 2)
         discount = float(order["discount"] or 0)
         if order["discount_type"] == "percent":
             discount = round(subtotal * discount / 100.0, 2)

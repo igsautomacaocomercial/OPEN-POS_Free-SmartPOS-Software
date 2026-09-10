@@ -410,7 +410,8 @@ class TablePopup(QDialog):
         if not self._ensure_waiter_for_items():
             return
         order = self._ensure_order()
-        order_service.add_item(order["id"], product_id=product_id, qty=1)
+        addons = self.cart.select_addons(product_id)
+        order_service.add_item(order["id"], product_id=product_id, qty=1, addons=addons)
         self.cart.refresh()
 
     def _ensure_waiter_for_items(self):

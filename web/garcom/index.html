@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ea580c">
+  <title>Open POS Garcom</title>
+  <link rel="manifest" href="/garcom/assets/manifest.webmanifest">
+  <link rel="icon" href="/garcom/assets/icon.svg">
+  <link rel="apple-touch-icon" href="/garcom/assets/icon.svg">
+  <link rel="stylesheet" href="/garcom/assets/styles.css?v=8">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <strong>Open POS Garcom</strong>
+      <span id="session-label">Selecione o atendente</span>
+    </div>
+    <div class="top-actions">
+      <button id="install-btn" class="ghost">Instalar</button>
+      <button id="logout-btn" class="ghost hidden">Sair</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="login-screen" class="screen active">
+      <div class="card hero">
+        <h1>Entrar</h1>
+        <p>Escolha seu nome para operar as mesas pelo celular.</p>
+        <div id="waiter-list" class="button-list"></div>
+      </div>
+    </section>
+
+    <section id="tables-screen" class="screen">
+      <div class="screen-head">
+        <h1>Mesas</h1>
+        <div class="row">
+          <button id="qr-requests-btn" class="primary">Pedidos QR</button>
+          <button id="refresh-tables" class="ghost">Atualizar</button>
+        </div>
+      </div>
+      <div id="tables-list" class="tables-grid"></div>
+    </section>
+
+    <section id="qr-screen" class="screen">
+      <div class="screen-head sticky">
+        <button id="back-qr" class="ghost">Voltar</button>
+        <div>
+          <h1>Pedidos QR</h1>
+          <p>Pedidos enviados pelos clientes aguardando aprovacao.</p>
+        </div>
+      </div>
+      <div id="qr-list" class="qr-list"></div>
+    </section>
+
+    <section id="table-screen" class="screen">
+      <div class="screen-head sticky">
+        <button id="back-tables" class="ghost">Voltar</button>
+        <div>
+          <h1 id="table-title">Mesa</h1>
+          <p id="table-subtitle"></p>
+        </div>
+      </div>
+
+      <div class="catalog-tools">
+        <input id="product-search" placeholder="Buscar produto...">
+        <div id="category-list" class="chips"></div>
+      </div>
+      <div id="product-list" class="product-list"></div>
+
+      <div class="card order-card launched-card">
+        <div class="row between">
+          <div>
+            <strong>Itens Lancados</strong>
+            <small id="items-count">0 itens</small>
+          </div>
+          <strong id="order-total">R$ 0,00</strong>
+        </div>
+        <div id="items-list" class="items-list empty">Sem itens.</div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="table-actions" class="bottom-actions hidden">
+    <div>
+      <small>Total da mesa</small>
+      <strong id="footer-total">R$ 0,00</strong>
+    </div>
+    <button id="send-kot" class="warning">Enviar KOT</button>
+    <button id="request-bill" class="primary">Pedir Conta</button>
+  </footer>
+
+  <div id="addon-modal" class="modal hidden">
+    <div class="modal-card">
+      <h2 id="addon-title">Adicionais</h2>
+      <div id="addon-list" class="addon-list"></div>
+      <div class="actions two">
+        <button id="addon-skip" class="ghost">Sem adicionais</button>
+        <button id="addon-confirm" class="primary">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/garcom/assets/app.js?v=8"></script>
+</body>
+</html>

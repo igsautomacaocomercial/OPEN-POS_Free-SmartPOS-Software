@@ -1,10 +1,11 @@
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QDoubleSpinBox, QFrame, QGridLayout, QHBoxLayout, QInputDialog,
-    QLabel, QLineEdit, QPushButton, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
-    QWidgetItem,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFrame,
+    QGridLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QPushButton,
+    QScrollArea, QSpinBox, QVBoxLayout, QWidget, QWidgetItem,
 )
 
+from app.services.addon_service import addon_service
 from app.services.order_service import order_service
 from app.services.product_service import product_service
 from app.services.settings_service import settings_service
@@ -269,6 +270,55 @@ class CartPanel(QFrame):
         self._reload_items()
         self._reload_totals()
 
+    def select_addons(self, product_id):
+        product = product_service.get(product_id)
+        if not product or not product["allow_addons"]:
+            return []
+        addons = addon_service.list_active()
+        if not addons:
+            return []
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Adicionais - {product['name']}")
+        dlg.setModal(True)
+        dlg.resize(420, 520)
+        lay = QVBoxLayout(dlg)
+        title = QLabel("Selecione os adicionais")
+        title.setObjectName("SectionHeader")
+        lay.addWidget(title)
+        currency = settings_service.get("currency", "R$")
+        checks = []
+        for addon in addons:
+            row = QFrame()
+            row.setObjectName("MenuItemRow")
+            rlay = QHBoxLayout(row)
+            rlay.setContentsMargins(12, 8, 12, 8)
+            cb = QCheckBox(f"{addon['name']}  + {fmt_money(addon['price'], currency)}")
+            cb.setMinimumHeight(42)
+            qty = QSpinBox()
+            qty.setRange(1, 20)
+            qty.setValue(1)
+            qty.setFixedWidth(70)
+            qty.setEnabled(False)
+            cb.toggled.connect(qty.setEnabled)
+            rlay.addWidget(cb, 1)
+            rlay.addWidget(QLabel("Qtd:"))
+            rlay.addWidget(qty)
+            lay.addWidget(row)
+            checks.append((addon, cb, qty))
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText("Adicionar")
+        buttons.button(QDialogButtonBox.Cancel).setText("Sem adicionais")
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        lay.addWidget(buttons)
+        if dlg.exec() != QDialog.Accepted:
+            return []
+        return [
+            {"addon_id": addon["id"], "qty": qty.value()}
+            for addon, cb, qty in checks
+            if cb.isChecked()
+        ]
+
     def _reload_items(self):
         for i in reversed(range(self.items_layout.count())):
             it = self.items_layout.itemAt(i)
@@ -289,7 +339,16 @@ class CartPanel(QFrame):
         lay = QHBoxLayout(frame)
         lay.setContentsMargins(12, 8, 8, 8)
         lay.setSpacing(8)
-        name_lbl = QLabel(item["name"])
+        name_text = item["name"]
+        addons = order_service.get_item_addons(item["id"])
+        if addons:
+            currency = settings_service.get("currency", "R$")
+            addon_lines = [
+                f"+ {a['name']} ({float(a['qty']):g}x {fmt_money(a['price'], currency)})"
+                for a in addons
+            ]
+            name_text += "\n" + "\n".join(addon_lines)
+        name_lbl = QLabel(name_text)
         name_lbl.setWordWrap(True)
         lay.addWidget(name_lbl, 1)
 

@@ -36,8 +36,18 @@ CREATE TABLE IF NOT EXISTS products (
     name TEXT NOT NULL,
     price REAL NOT NULL DEFAULT 0,
     cost REAL NOT NULL DEFAULT 0,
+    allow_addons INTEGER NOT NULL DEFAULT 0,
+    image_path TEXT NOT NULL DEFAULT '',
     is_active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS add_ons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    price REAL NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS tables (
@@ -141,6 +151,45 @@ CREATE TABLE IF NOT EXISTS order_items (
     kot_printed_instructions TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS order_item_addons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_item_id INTEGER NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+    addon_id INTEGER,
+    name TEXT NOT NULL,
+    price REAL NOT NULL DEFAULT 0,
+    qty REAL NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS qr_order_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_id INTEGER NOT NULL REFERENCES tables(id) ON DELETE CASCADE,
+    customer_name TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    handled_at TEXT,
+    handled_by INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS qr_order_request_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL REFERENCES qr_order_requests(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    name TEXT NOT NULL,
+    price REAL NOT NULL DEFAULT 0,
+    qty REAL NOT NULL DEFAULT 1,
+    instructions TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS qr_order_request_item_addons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_item_id INTEGER NOT NULL REFERENCES qr_order_request_items(id) ON DELETE CASCADE,
+    addon_id INTEGER,
+    name TEXT NOT NULL,
+    price REAL NOT NULL DEFAULT 0,
+    qty REAL NOT NULL DEFAULT 1
+);
+
 CREATE TABLE IF NOT EXISTS expense_categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL
@@ -210,6 +259,9 @@ CREATE TABLE IF NOT EXISTS chart_accounts (
 CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_item_addons_item ON order_item_addons(order_item_id);
+CREATE INDEX IF NOT EXISTS idx_qr_order_requests_status ON qr_order_requests(status);
+CREATE INDEX IF NOT EXISTS idx_qr_order_request_items_request ON qr_order_request_items(request_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date);
 """
 
@@ -238,6 +290,9 @@ _DEFAULT_SETTINGS = {
     "auto_backup": "0",
     "auto_backup_hours": "24",
     "require_waiter_before_items": "0",
+    "local_api_enabled": "0",
+    "local_api_host": "0.0.0.0",
+    "local_api_port": "8080",
 }
 
 
@@ -321,6 +376,11 @@ class Database:
         for name in ("stock", "barcode"):
             if name in pcols:
                 self._conn.execute(f"ALTER TABLE products DROP COLUMN {name}")
+        pcols = {r["name"] for r in self._conn.execute("PRAGMA table_info(products)").fetchall()}
+        if "allow_addons" not in pcols:
+            self._conn.execute("ALTER TABLE products ADD COLUMN allow_addons INTEGER NOT NULL DEFAULT 0")
+        if "image_path" not in pcols:
+            self._conn.execute("ALTER TABLE products ADD COLUMN image_path TEXT NOT NULL DEFAULT ''")
         for table in ("accounts_payable", "accounts_receivable"):
             cols = {r["name"] for r in self._conn.execute(
                 f"PRAGMA table_info({table})").fetchall()}

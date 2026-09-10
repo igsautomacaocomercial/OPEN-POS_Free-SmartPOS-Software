@@ -375,7 +375,8 @@ class QuickSalePage(QWidget):
         oid = self._ensure_order()
         if oid is None:
             return
-        order_service.add_item(oid, product_id=product_id, qty=1)
+        addons = self.cart.select_addons(product_id)
+        order_service.add_item(oid, product_id=product_id, qty=1, addons=addons)
         self.cart.refresh()
 
     def _ensure_delivery_attendant(self):
@@ -1032,6 +1033,12 @@ class QuickSalePage(QWidget):
                 instr = str(it.get("instructions") or "").strip()
                 if instr:
                     out.append(f"{indent}>>> {instr.upper()} <<<")
+                for addon in order_service.get_item_addons(it["id"]):
+                    try:
+                        addon_qty = f"{float(addon['qty'] or 1):g}"
+                    except (TypeError, ValueError):
+                        addon_qty = str(addon["qty"] or 1)
+                    out.append(f"{indent}+ {addon_qty}X {str(addon['name']).upper()}")
                 if action in ("CANCELAR", "ALTERAR OBS"):
                     out.append("-" * width)
             return out
@@ -1066,7 +1073,14 @@ class QuickSalePage(QWidget):
 
     def _order_summary(self, order):
         items = order_service.get_items(order["id"])
-        return "  ·  ".join(f"{it['name']} x{it['qty']:g}" for it in items) or "—"
+        parts = []
+        for it in items:
+            addons = order_service.get_item_addons(it["id"])
+            extra = ""
+            if addons:
+                extra = " (+ " + ", ".join(a["name"] for a in addons) + ")"
+            parts.append(f"{it['name']}{extra} x{it['qty']:g}")
+        return "  ·  ".join(parts) or "—"
 
     def _meta_line(self, order):
         parts = []

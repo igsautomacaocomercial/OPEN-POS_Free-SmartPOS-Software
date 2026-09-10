@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 from app.services.aux_service import (
     customer_service, neighborhood_service, payment_service, supplier_service,
 )
+from app.services.addon_service import addon_service
 from app.services.auth_service import auth_service
 from app.services.brasil_api import brazil_api_service, only_digits, format_cep, format_cnpj
 from app.services.chart_account_service import chart_account_service
@@ -39,7 +40,7 @@ class AuxiliariesView(QWidget):
         title.setObjectName("PageTitle")
         outer.addWidget(title)
         sub = QLabel("Cadastros de apoio: Mesas, Clientes, Fornecedores, Bairros, Entregadores, "
-                     "Formas de Pagamento, Plano de Contas, Categorias, Equipe e Usuários.")
+                     "Formas de Pagamento, Plano de Contas, Categorias, Adicionais, Equipe e Usuarios.")
         sub.setObjectName("PageSubtitle")
         outer.addWidget(sub)
 
@@ -52,6 +53,7 @@ class AuxiliariesView(QWidget):
         self.tabs.addTab(self._build_payments_tab(), "Formas de Pagamento")
         self.tabs.addTab(self._build_chart_tab(), "Plano de Contas")
         self.tabs.addTab(self._build_categories_tab(), "Categorias")
+        self.tabs.addTab(self._build_addons_tab(), "Adicionais")
         self.tabs.addTab(self._build_staff_tab(), "Equipe")
         self.tabs.addTab(self._build_users_tab(), "Usuários")
         outer.addWidget(self.tabs, 1)
@@ -1320,6 +1322,114 @@ class AuxiliariesView(QWidget):
             self.refresh_categories()
         except ValueError as e:
             QMessageBox.warning(self, "Não é Possível Excluir", str(e))
+
+    # ---------------- Add-ons ----------------
+    def _build_addons_tab(self):
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setSpacing(10)
+        form_row = QHBoxLayout()
+        form_row.addWidget(QLabel("Nome:"))
+        self.addon_name = QLineEdit()
+        self.addon_name.setFixedWidth(220)
+        self.addon_name.setPlaceholderText("Ex.: Ovo, Bacon, Queijo")
+        form_row.addWidget(self.addon_name)
+        form_row.addWidget(QLabel("Preco:"))
+        self.addon_price = QDoubleSpinBox()
+        self.addon_price.setRange(0, 100000)
+        self.addon_price.setDecimals(2)
+        self.addon_price.setPrefix(settings_service.get("currency", "R$") + " ")
+        self.addon_price.setFixedWidth(130)
+        form_row.addWidget(self.addon_price)
+        add = QPushButton("+  Adicionar")
+        add.setProperty("primary", True)
+        add.clicked.connect(self._add_addon)
+        form_row.addWidget(add)
+        form_row.addStretch()
+        lay.addLayout(form_row)
+
+        self.addons_table = QTableWidget(0, 4)
+        self.addons_table.setHorizontalHeaderLabels(["ID", "Nome", "Preco", "Ativo"])
+        self._style_aux_table(self.addons_table)
+        lay.addWidget(self.addons_table, 1)
+
+        row_btns = QHBoxLayout()
+        edit = QPushButton("Editar")
+        edit.clicked.connect(self._edit_addon)
+        toggle = QPushButton("Ativar / Desativar")
+        toggle.clicked.connect(self._toggle_addon)
+        delete = QPushButton("Excluir")
+        delete.setProperty("danger", True)
+        delete.clicked.connect(self._delete_addon)
+        row_btns.addStretch()
+        row_btns.addWidget(edit)
+        row_btns.addWidget(toggle)
+        row_btns.addWidget(delete)
+        lay.addLayout(row_btns)
+        self.refresh_addons()
+        bind_table_keys(self.addons_table, on_enter=self._edit_addon, on_delete=self._delete_addon)
+        return w
+
+    def refresh_addons(self):
+        rows = addon_service.list_all()
+        self.addons_table.setRowCount(len(rows))
+        currency = settings_service.get("currency", "R$")
+        for i, addon in enumerate(rows):
+            self.addons_table.setItem(i, 0, QTableWidgetItem(str(addon["id"])))
+            self.addons_table.setItem(i, 1, QTableWidgetItem(addon["name"]))
+            self.addons_table.setItem(i, 2, QTableWidgetItem(fmt_money(addon["price"], currency)))
+            self.addons_table.setItem(i, 3, QTableWidgetItem("Sim" if addon["is_active"] else "Nao"))
+        self.addons_table.resizeColumnsToContents()
+
+    def _selected_addon(self):
+        row = self.addons_table.currentRow()
+        if row < 0:
+            return None
+        rows = addon_service.list_all()
+        if row >= len(rows):
+            return None
+        return rows[row]
+
+    def _add_addon(self):
+        try:
+            addon_service.add(self.addon_name.text().strip(), self.addon_price.value())
+        except ValueError as e:
+            QMessageBox.warning(self, "Adicionais", str(e))
+            return
+        self.addon_name.clear()
+        self.addon_price.setValue(0)
+        self.refresh_addons()
+
+    def _edit_addon(self):
+        addon = self._selected_addon()
+        if not addon:
+            return
+        name, ok = QInputDialog.getText(self, "Editar Adicional", "Nome:", text=addon["name"])
+        if not ok or not name.strip():
+            return
+        price, ok2 = QInputDialog.getDouble(
+            self, "Editar Adicional", "Preco:", value=float(addon["price"] or 0), minValue=0, maxValue=100000, decimals=2)
+        if not ok2:
+            return
+        addon_service.update(addon["id"], name.strip(), price, bool(addon["is_active"]), addon["sort_order"])
+        self.refresh_addons()
+
+    def _toggle_addon(self):
+        addon = self._selected_addon()
+        if not addon:
+            return
+        addon_service.update(addon["id"], addon["name"], addon["price"], not addon["is_active"], addon["sort_order"])
+        self.refresh_addons()
+
+    def _delete_addon(self):
+        addon = self._selected_addon()
+        if not addon:
+            return
+        try:
+            addon_service.delete(addon["id"])
+            self.refresh_addons()
+        except ValueError as e:
+            QMessageBox.warning(self, "Nao e Possivel Excluir", str(e))
 
     # ---------------- Staff ----------------
     def _build_staff_tab(self):

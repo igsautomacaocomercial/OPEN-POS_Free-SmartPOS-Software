@@ -1,4 +1,5 @@
 import shutil
+import socket
 import uuid
 
 from PySide6.QtCore import QSize, Qt, Signal
@@ -212,6 +213,39 @@ class SettingsView(QWidget):
         self.require_waiter_before_items = QCheckBox("Solicitar garçom antes de lançar itens na mesa")
         cv.addWidget(self.require_waiter_before_items)
 
+        api_title = QLabel("App do Garçom na Rede Local")
+        api_title.setStyleSheet("font-weight: 800; font-size: 15px; margin-top: 12px;")
+        cv.addWidget(api_title)
+
+        api_hint = QLabel(
+            "Ative para acessar o app do garçom pelo celular na mesma rede. O IP é detectado automaticamente."
+        )
+        api_hint.setProperty("muted", True)
+        api_hint.setWordWrap(True)
+        cv.addWidget(api_hint)
+
+        self.local_api_enabled = QCheckBox("Ativar API local / app do garçom")
+        cv.addWidget(self.local_api_enabled)
+
+        api_form = QFormLayout()
+        self.local_api_host = QLineEdit()
+        self.local_api_host.setText("0.0.0.0")
+        self.local_api_host.setReadOnly(True)
+        self.local_api_port = QSpinBox()
+        self.local_api_port.setRange(1024, 65535)
+        self.local_api_port.setValue(8080)
+        self.local_api_port.valueChanged.connect(self._update_local_api_url)
+        self.local_api_url = QLabel()
+        self.local_api_url.setProperty("muted", True)
+        self.local_api_url.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        refresh_ip = QPushButton("Atualizar IP")
+        refresh_ip.clicked.connect(self._update_local_api_url)
+        api_form.addRow("Escutar em", self.local_api_host)
+        api_form.addRow("Porta", self.local_api_port)
+        api_form.addRow("Link do celular", self.local_api_url)
+        api_form.addRow("", refresh_ip)
+        cv.addLayout(api_form)
+
         lay.addWidget(card)
 
         save = QPushButton("Salvar Configurações de Atendimento")
@@ -226,7 +260,37 @@ class SettingsView(QWidget):
             "require_waiter_before_items",
             "1" if self.require_waiter_before_items.isChecked() else "0",
         )
+        settings_service.set_many({
+            "local_api_enabled": "1" if self.local_api_enabled.isChecked() else "0",
+            "local_api_host": "0.0.0.0",
+            "local_api_port": str(self.local_api_port.value()),
+        })
+        try:
+            from app.api.runtime import local_api_runtime
+            if self.local_api_enabled.isChecked():
+                started = local_api_runtime.start("0.0.0.0", self.local_api_port.value())
+                if not started:
+                    detail = local_api_runtime.last_error or "Verifique dependências e porta."
+                    QMessageBox.warning(self, "API local", f"Não foi possível iniciar a API local.\n\nDetalhe: {detail}")
+            else:
+                local_api_runtime.stop()
+        except Exception as exc:
+            QMessageBox.warning(self, "API local", f"Não foi possível aplicar a configuração da API local.\n\nDetalhe: {exc}")
         QMessageBox.information(self, "Salvo", "Configurações de atendimento salvas.")
+
+    def _local_ip(self):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                return s.getsockname()[0]
+        except Exception:
+            try:
+                return socket.gethostbyname(socket.gethostname())
+            except Exception:
+                return "IP_DO_PC"
+
+    def _update_local_api_url(self):
+        self.local_api_url.setText(f"http://{self._local_ip()}:{self.local_api_port.value()}/garcom")
 
     # ---------------- Printing ----------------
     def _build_printing_tab(self):
@@ -515,6 +579,13 @@ class SettingsView(QWidget):
         self.rec_show_logo.setChecked(s.get("receipt_show_logo", "1") == "1")
         self.rec_show_address.setChecked(s.get("receipt_show_address", "1") == "1")
         self.require_waiter_before_items.setChecked(s.get("require_waiter_before_items", "0") == "1")
+        self.local_api_enabled.setChecked(s.get("local_api_enabled", "0") == "1")
+        self.local_api_host.setText("0.0.0.0")
+        try:
+            self.local_api_port.setValue(int(s.get("local_api_port", "8080")))
+        except (TypeError, ValueError):
+            self.local_api_port.setValue(8080)
+        self._update_local_api_url()
         self._populate_printers(keep=s.get("printer_name", "").strip())
         enc = s.get("printer_encoding", "cp437")
         eidx = self.p_encoding.findText(enc)

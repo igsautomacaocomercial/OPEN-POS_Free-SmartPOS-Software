@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f172a">
+  <title>Cardapio Digital</title>
+  <link rel="stylesheet" href="/cardapio/assets/styles.css?v=2">
+</head>
+<body>
+  <header class="hero">
+    <small>Open POS</small>
+    <h1>Cardapio Digital</h1>
+    <p id="table-label">Mesa</p>
+  </header>
+
+  <main>
+    <section id="start-screen" class="screen active">
+      <div class="card">
+        <h2>Seu nome</h2>
+        <p>Informe seu nome para identificar o pedido na mesa.</p>
+        <input id="customer-name" placeholder="Ex.: Joao">
+        <button id="start-btn" class="primary">Ver Cardapio</button>
+      </div>
+    </section>
+
+    <section id="menu-screen" class="screen">
+      <div class="tools">
+        <input id="product-search" placeholder="Buscar produto...">
+        <div id="category-list" class="chips"></div>
+      </div>
+      <div id="product-list" class="product-list"></div>
+
+      <div class="card cart-card">
+        <div class="between">
+          <div>
+            <strong>Meu Pedido</strong>
+            <small id="cart-count">0 itens</small>
+          </div>
+          <strong id="cart-total">R$ 0,00</strong>
+        </div>
+        <div id="cart-list" class="cart-list empty">Nenhum item.</div>
+      </div>
+    </section>
+
+    <section id="done-screen" class="screen">
+      <div class="card done">
+        <h2>Pedido enviado</h2>
+        <p>Seu pedido foi enviado para aprovacao. Aguarde o garcom confirmar.</p>
+        <button id="new-order" class="primary">Fazer outro pedido</button>
+      </div>
+    </section>
+  </main>
+
+  <footer id="bottom-bar" class="bottom hidden">
+    <div>
+      <small>Total</small>
+      <strong id="bottom-total">R$ 0,00</strong>
+    </div>
+    <button id="send-order" class="primary">Enviar Pedido</button>
+  </footer>
+
+  <div id="addon-modal" class="modal hidden">
+    <div class="modal-card">
+      <h2 id="addon-title">Adicionais</h2>
+      <textarea id="item-note" placeholder="Observacao do item. Ex.: sem cebola"></textarea>
+      <div id="addon-list" class="addon-list"></div>
+      <div class="actions two">
+        <button id="addon-skip" class="ghost">Sem adicionais</button>
+        <button id="addon-confirm" class="primary">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/cardapio/assets/app.js?v=2"></script>
+</body>
+</html>

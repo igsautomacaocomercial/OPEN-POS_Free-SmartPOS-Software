@@ -48,16 +48,16 @@ class ProductService:
     def get(self, product_id):
         return self._db.fetchone("SELECT * FROM products WHERE id=?", (product_id,))
 
-    def add(self, name, price, cost, category_id):
+    def add(self, name, price, cost, category_id, allow_addons=False, image_path=""):
         self._db.execute(
-            "INSERT INTO products (name, price, cost, category_id) VALUES (?,?,?,?)",
-            (name, price, cost, category_id),
+            "INSERT INTO products (name, price, cost, category_id, allow_addons, image_path) VALUES (?,?,?,?,?,?)",
+            (name, price, cost, category_id, 1 if allow_addons else 0, image_path or ""),
         )
 
-    def update(self, product_id, name, price, cost, category_id, is_active=True):
+    def update(self, product_id, name, price, cost, category_id, is_active=True, allow_addons=False, image_path=""):
         self._db.execute(
-            "UPDATE products SET name=?, price=?, cost=?, category_id=?, is_active=? WHERE id=?",
-            (name, price, cost, category_id, 1 if is_active else 0, product_id),
+            "UPDATE products SET name=?, price=?, cost=?, category_id=?, is_active=?, allow_addons=?, image_path=? WHERE id=?",
+            (name, price, cost, category_id, 1 if is_active else 0, 1 if allow_addons else 0, image_path or "", product_id),
         )
 
     def delete(self, product_id):

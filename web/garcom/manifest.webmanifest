@@ -1,0 +1,18 @@
+{
+  "name": "Open POS Garcom",
+  "short_name": "Garcom",
+  "start_url": "/garcom",
+  "scope": "/garcom",
+  "display": "standalone",
+  "background_color": "#f4f6fb",
+  "theme_color": "#ea580c",
+  "description": "App local do garcom para mesas, adicionais e KOT do Open POS.",
+  "icons": [
+    {
+      "src": "/garcom/assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

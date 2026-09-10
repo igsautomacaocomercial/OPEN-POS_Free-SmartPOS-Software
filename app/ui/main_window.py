@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.services.settings_service import settings_service
+from app.api.runtime import local_api_runtime
 from app.ui.dashboard_view import DashboardView
 from app.ui.dining_view import DiningView
 from app.ui.expenses_view import ExpensesView
@@ -53,6 +54,7 @@ class MainWindow(QMainWindow):
         self._sidebar_visible = True
         self.allowed = ROLE_ACCESS.get(self.user.get("role"), {"dashboard"})
         self._build()
+        local_api_runtime.start_from_settings()
         QShortcut(QKeySequence("F11"), self, activated=self._toggle_fullscreen)
         QTimer.singleShot(6000, self._auto_backup)
 
@@ -261,6 +263,10 @@ class MainWindow(QMainWindow):
             self.showNormal()
         else:
             self.showFullScreen()
+
+    def closeEvent(self, event):
+        local_api_runtime.stop()
+        super().closeEvent(event)
 
     def _user_box(self):
         box = QFrame()

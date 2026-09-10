@@ -10,8 +10,9 @@ else:
     BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 LOGOS_DIR = DATA_DIR / "logos"
+PRODUCT_IMAGES_DIR = DATA_DIR / "product_images"
 BACKUPS_DIR = DATA_DIR / "backups"
 DB_PATH = DATA_DIR / "openpos.db"
 
-for _d in (DATA_DIR, LOGOS_DIR, BACKUPS_DIR):
+for _d in (DATA_DIR, LOGOS_DIR, PRODUCT_IMAGES_DIR, BACKUPS_DIR):
     _d.mkdir(parents=True, exist_ok=True)

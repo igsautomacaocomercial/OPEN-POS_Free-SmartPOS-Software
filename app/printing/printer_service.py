@@ -159,7 +159,12 @@ def _store_header(b: EscposBuilder, show_contact=True):
 
 def _items_for(order):
     from app.services.order_service import order_service
-    return [dict(i) for i in order_service.get_items(order["id"])]
+    items = []
+    for item in order_service.get_items(order["id"]):
+        row = dict(item)
+        row["addons"] = [dict(a) for a in order_service.get_item_addons(item["id"])]
+        items.append(row)
+    return items
 
 
 def _info_lines(order, cashier_label=True, show_day=True, show_waiter=True, show_rider=False):
@@ -193,11 +198,14 @@ def _order_type_label(order):
 
 
 def _items_rows(order, show_price=True, items=None):
-    items = [dict(i) for i in items] if items is not None else _items_for(order)
-    return [
-        {"name": it["name"], "qty": it["qty"], "price": it["price"] if show_price else ""}
-        for it in items
-    ]
+    from app.services.order_service import order_service
+    source = [dict(i) for i in items] if items is not None else _items_for(order)
+    rows = []
+    for it in source:
+        addons = it.get("addons") or [dict(a) for a in order_service.get_item_addons(it["id"])]
+        addons_total = sum(float(a["price"] or 0) * float(a["qty"] or 0) for a in addons)
+        rows.append({"name": it["name"], "qty": it["qty"], "price": (float(it["price"] or 0) + addons_total) if show_price else ""})
+    return rows
 
 
 def _summary_rows(order):
@@ -232,6 +240,7 @@ def _kot_type_label(order) -> str:
 
 
 def _kot_item_lines(items, cols: int) -> list[str]:
+    from app.services.order_service import order_service
     qty_w = 3
     gap = 2
     name_w = max(16, cols - qty_w - gap)
@@ -258,6 +267,13 @@ def _kot_item_lines(items, cols: int) -> list[str]:
         instr = str(it.get("instructions") or "").strip()
         if instr:
             lines.append(f"{indent}>>> {instr.upper()} <<<")
+        addons = it.get("addons") or [dict(a) for a in order_service.get_item_addons(it["id"])]
+        for addon in addons:
+            try:
+                addon_qty = f"{float(addon.get('qty') or 1):g}"
+            except (TypeError, ValueError):
+                addon_qty = str(addon.get("qty") or 1)
+            lines.append(f"{indent}+ {addon_qty}X {str(addon.get('name') or '').upper()}")
         if action in ("CANCELAR", "ALTERAR OBS"):
             lines.append("-" * cols)
     return lines
@@ -339,7 +355,10 @@ def _bill_text(order, title="CONTA", include_payment=False) -> str:
                 qty_s = f"{float(qty):g}"
             except (TypeError, ValueError):
                 qty_s = str(qty)
-            price_s = fmt_money(it.get("price", 0), currency)
+            addons = it.get("addons") or []
+            addons_total = sum(float(a.get("price") or 0) * float(a.get("qty") or 0) for a in addons)
+            unit_price = float(it.get("price") or 0) + addons_total
+            price_s = fmt_money(unit_price, currency)
             chunks = _fit(name, name_w)
             for i, chunk in enumerate(chunks):
                 if i == 0:
@@ -349,6 +368,14 @@ def _bill_text(order, title="CONTA", include_payment=False) -> str:
             instr = str(it.get("instructions") or "").strip()
             if instr:
                 out.append(f"{indent}>>> {instr.upper()} <<<")
+            for addon in addons:
+                try:
+                    addon_qty = f"{float(addon.get('qty') or 1):g}"
+                except (TypeError, ValueError):
+                    addon_qty = str(addon.get("qty") or 1)
+                addon_text = f"+ {addon_qty}X {str(addon.get('name') or '').upper()}"
+                addon_price = fmt_money(float(addon.get("price") or 0), currency)
+                out.append(f"{indent}{addon_text.ljust(name_w)}{addon_price.rjust(price_w)}")
         return out
 
     items = _items_for(order)
