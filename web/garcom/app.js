@@ -401,9 +401,23 @@ window.addEventListener('appinstalled', () => {
   $('install-btn').classList.add('hidden');
 });
 
+let qrBlinkState = false;
 setInterval(() => {
   if (state.token && $('tables-screen').classList.contains('active')) refreshQrBadge();
 }, 10000);
+setInterval(() => {
+  if (state.token) {
+    qrBlinkState = !qrBlinkState;
+    const btn = $('qr-requests-btn');
+    if (btn.textContent.includes('(')) {
+      btn.style.background = qrBlinkState ? '#fef3c7' : '';
+      btn.style.color = qrBlinkState ? '#92400e' : '';
+    } else {
+      btn.style.background = '';
+      btn.style.color = '';
+    }
+  }
+}, 800);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

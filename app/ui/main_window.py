@@ -126,6 +126,15 @@ class MainWindow(QMainWindow):
             self._nav_icons[key] = ico
             btn.toggled.connect(lambda ch, k=key: self._nav_style(k, ch))
             btn.clicked.connect(lambda _=False, k=key: self.switch_page(k))
+            if key == "qr_orders":
+                self._qr_badge_timer = QTimer(btn)
+                self._qr_badge_timer.setInterval(10000)
+                self._qr_badge_timer.timeout.connect(lambda: self._update_qr_badge(btn))
+                self._qr_badge_timer.start()
+                self._qr_blink_timer = QTimer(btn)
+                self._qr_blink_timer.setInterval(800)
+                self._qr_blink_state = False
+                self._qr_blink_timer.timeout.connect(lambda: self._blink_qr_badge(btn))
             sl.addWidget(btn)
             self.nav_buttons[key] = btn
 
@@ -168,6 +177,15 @@ class MainWindow(QMainWindow):
             rb.setToolTip(label)
             rb.toggled.connect(lambda ch, k=key: self._rail_style(k, ch))
             rb.clicked.connect(lambda _=False, k=key: self.switch_page(k))
+            if key == "qr_orders":
+                self._rail_qr_badge_timer = QTimer(rb)
+                self._rail_qr_badge_timer.setInterval(10000)
+                self._rail_qr_badge_timer.timeout.connect(lambda: self._update_rail_qr_badge(rb))
+                self._rail_qr_badge_timer.start()
+                self._rail_qr_blink_timer = QTimer(rb)
+                self._rail_qr_blink_timer.setInterval(800)
+                self._rail_qr_blink_state = False
+                self._rail_qr_blink_timer.timeout.connect(lambda: self._blink_rail_qr_badge(rb))
             rl.addWidget(rb)
             self.rail_buttons[key] = rb
         rl.addStretch()
@@ -230,6 +248,50 @@ class MainWindow(QMainWindow):
             return
         color = "#ffffff" if checked else "#4b5563"
         self.rail_buttons[key].setIcon(make_icon(ico, color, 24))
+
+    def _update_qr_badge(self, btn):
+        try:
+            from app.services.qr_order_service import qr_order_service
+            count = len(qr_order_service.list_pending())
+            if count:
+                btn.setText(f"   Pedidos QR ({count})")
+                if not self._qr_blink_timer.isActive():
+                    self._qr_blink_timer.start()
+            else:
+                btn.setText("   Pedidos QR")
+                self._qr_blink_timer.stop()
+                btn.setStyleSheet("")
+        except Exception:
+            pass
+
+    def _blink_qr_badge(self, btn):
+        self._qr_blink_state = not self._qr_blink_state
+        if self._qr_blink_state:
+            btn.setStyleSheet("QPushButton { background: #fef3c7; color: #92400e; }")
+        else:
+            btn.setStyleSheet("")
+
+    def _update_rail_qr_badge(self, btn):
+        try:
+            from app.services.qr_order_service import qr_order_service
+            count = len(qr_order_service.list_pending())
+            if count:
+                btn.setToolTip(f"Pedidos QR ({count})")
+                if not self._rail_qr_blink_timer.isActive():
+                    self._rail_qr_blink_timer.start()
+            else:
+                btn.setToolTip("Pedidos QR")
+                self._rail_qr_blink_timer.stop()
+                btn.setStyleSheet("")
+        except Exception:
+            pass
+
+    def _blink_rail_qr_badge(self, btn):
+        self._rail_qr_blink_state = not self._rail_qr_blink_state
+        if self._rail_qr_blink_state:
+            btn.setStyleSheet("QPushButton { background: #fef3c7; }")
+        else:
+            btn.setStyleSheet("")
 
     def _collapse_sidebar(self):
         self._sidebar_visible = False
