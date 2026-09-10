@@ -308,6 +308,8 @@ def _kot_text(order, items=None, title="KOT") -> str:
     if order.get("waiter_name"):
         label = "ATENDENTE" if order.get("order_type") == "delivery" else "GARÇOM"
         lines.append(f"{label}: {str(order['waiter_name']).upper()}".center(cols))
+    if order.get("customer_name"):
+        lines.append(f"CLIENTE: {str(order['customer_name']).upper()}".center(cols))
     lines.append("=" * cols)
     lines.append("QTD  PRODUTO")
     lines.append("=" * cols)
@@ -404,6 +406,8 @@ def _bill_text(order, title="CONTA", include_payment=False) -> str:
     if order.get("waiter_name"):
         label = "ATENDENTE" if order.get("order_type") == "delivery" else "GARÇOM"
         lines.append(f"{label}: {order['waiter_name']}".center(cols))
+    if order.get("customer_name"):
+        lines.append(f"CLIENTE: {order['customer_name']}".center(cols))
     lines.append("=" * cols)
     lines.extend(item_lines(items))
     lines.append("=" * cols)

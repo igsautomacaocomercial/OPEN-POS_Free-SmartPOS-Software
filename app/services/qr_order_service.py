@@ -81,10 +81,18 @@ class QrOrderService:
             raise ValueError("Pedido QR nao esta pendente.")
         order = order_service.get_open_order_for_table(request["table_id"])
         if not order:
-            order = order_service.create_order(order_type="dine-in", table_id=request["table_id"], waiter_id=waiter_id)
+            order = order_service.create_order(
+                order_type="dine-in",
+                table_id=request["table_id"],
+                waiter_id=waiter_id,
+                customer_name=request["customer_name"],
+            )
             table_service.set_status(request["table_id"], "occupied", order["id"])
         elif waiter_id and not order["waiter_id"]:
             order_service.set_waiter(order["id"], waiter_id)
+            order = order_service.get(order["id"])
+        if order and not (order["customer_name"] or "").strip():
+            order_service.set_customer_info(order["id"], name=request["customer_name"])
             order = order_service.get(order["id"])
         added_item_ids = []
         for item in self.items(request_id):
@@ -92,12 +100,9 @@ class QrOrderService:
                 {"addon_id": addon["addon_id"], "qty": addon["qty"]}
                 for addon in self.item_addons(item["id"])
             ]
-            note = (item["instructions"] or "").strip()
-            customer = (request["customer_name"] or "").strip()
-            if customer:
-                note = f"Cliente: {customer}" + (f" | {note}" if note else "")
             item_id = order_service.add_item(
-                order["id"], product_id=item["product_id"], qty=item["qty"], instructions=note, addons=addons
+                order["id"], product_id=item["product_id"], qty=item["qty"],
+                instructions=(item["instructions"] or "").strip(), addons=addons
             )
             added_item_ids.append(item_id)
         self._db.execute(

@@ -326,10 +326,14 @@ def create_app():
     @app.post("/api/waiter/qr-requests/{request_id}/accept")
     def accept_qr_request(request_id: int, staff=Depends(_current_staff)):
         try:
+            request = qr_order_service.get(request_id)
             order, item_ids = qr_order_service.accept(request_id, staff["id"])
             items = [dict(i) for i in order_service.get_items(order["id"]) if i["id"] in item_ids]
             if items:
-                print_kot(order, items=items)
+                order_for_print = dict(order)
+                if request and request["customer_name"]:
+                    order_for_print["customer_name"] = request["customer_name"]
+                print_kot(order_for_print, items=items)
                 order_service.mark_kot_printed(order["id"], items)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
