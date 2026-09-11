@@ -421,35 +421,6 @@ class Database:
             if k not in existing:
                 self.execute("INSERT INTO settings (key, value) VALUES (?,?)", (k, v))
 
-        if not self.fetchone("SELECT id FROM categories LIMIT 1"):
-            seed_categories = ["Café", "Chá", "Bebidas Frias", "Shakes", "Sobremesas", "Lanches"]
-            for i, name in enumerate(seed_categories, 1):
-                self.execute(
-                    "INSERT INTO categories (name, sort_order) VALUES (?,?)", (name, i)
-                )
-            products = [
-                ("Café Expresso", 250, 90, 1),
-                ("Cappuccino", 350, 140, 1),
-                ("Café com Leite", 380, 150, 1),
-                ("Chocolate Quente", 400, 180, 1),
-                ("Chá Karak", 150, 60, 2),
-                ("Chá Verde", 200, 80, 2),
-                ("Chá Gelado", 250, 100, 3),
-                ("Café Gelado", 350, 150, 3),
-                ("Milk Shake de Chocolate", 450, 200, 4),
-                ("Milk Shake de Manga", 420, 180, 4),
-                ("Fatia de Cheesecake", 550, 300, 5),
-                ("Brownie", 450, 200, 5),
-                ("Sanduíche", 400, 220, 6),
-                ("Batata Frita", 300, 120, 6),
-                ("Sanduíche de Frango", 550, 300, 6),
-            ]
-            for name, price, cost, cat in products:
-                self.execute(
-                    "INSERT INTO products (name, price, cost, category_id) VALUES (?,?,?,?)",
-                    (name, price, cost, cat),
-                )
-
         if not self.fetchone("SELECT id FROM staff LIMIT 1"):
             self.execute("INSERT INTO staff (name, role) VALUES (?,?)", ("Garçom 1", "Garçom"))
             self.execute("INSERT INTO staff (name, role) VALUES (?,?)", ("Garçom 2", "Garçom"))
