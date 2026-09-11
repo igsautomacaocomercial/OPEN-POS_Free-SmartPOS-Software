@@ -129,12 +129,12 @@ class MainWindow(QMainWindow):
             if key == "qr_orders":
                 self._qr_badge_timer = QTimer(btn)
                 self._qr_badge_timer.setInterval(10000)
-                self._qr_badge_timer.timeout.connect(lambda: self._update_qr_badge(btn))
+                self._qr_badge_timer.timeout.connect(lambda b=btn: self._update_qr_badge(b))
                 self._qr_badge_timer.start()
                 self._qr_blink_timer = QTimer(btn)
                 self._qr_blink_timer.setInterval(800)
                 self._qr_blink_state = False
-                self._qr_blink_timer.timeout.connect(lambda: self._blink_qr_badge(btn))
+                self._qr_blink_timer.timeout.connect(lambda b=btn: self._blink_qr_badge(b))
             sl.addWidget(btn)
             self.nav_buttons[key] = btn
 
@@ -180,12 +180,12 @@ class MainWindow(QMainWindow):
             if key == "qr_orders":
                 self._rail_qr_badge_timer = QTimer(rb)
                 self._rail_qr_badge_timer.setInterval(10000)
-                self._rail_qr_badge_timer.timeout.connect(lambda: self._update_rail_qr_badge(rb))
+                self._rail_qr_badge_timer.timeout.connect(lambda r=rb: self._update_rail_qr_badge(r))
                 self._rail_qr_badge_timer.start()
                 self._rail_qr_blink_timer = QTimer(rb)
                 self._rail_qr_blink_timer.setInterval(800)
                 self._rail_qr_blink_state = False
-                self._rail_qr_blink_timer.timeout.connect(lambda: self._blink_rail_qr_badge(rb))
+                self._rail_qr_blink_timer.timeout.connect(lambda r=rb: self._blink_rail_qr_badge(r))
             rl.addWidget(rb)
             self.rail_buttons[key] = rb
         rl.addStretch()
